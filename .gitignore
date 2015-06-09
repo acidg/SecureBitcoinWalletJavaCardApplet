@@ -15,8 +15,6 @@ classes/
 gen-external-apklibs/
 
 # Eclipse project files
-.classpath
-.project
 .metadata
 .settings
 
