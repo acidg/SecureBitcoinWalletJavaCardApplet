@@ -44,6 +44,7 @@ Thumbs.db
 # Generated files
 bin/
 gen/
+javacard/
 
 # Gradle files
 .gradle/
