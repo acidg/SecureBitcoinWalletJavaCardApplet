@@ -1,0 +1,44 @@
+# Sets the protocol mode to GlobalPlatform 2.1.1.
+mode_211
+
+# Enable APDU trace
+# You will see the sent APDUs as clear text. The last two bytes of the
+# response are the response code. A response code of 9000 means success,
+# otherwise the response code indicates an error. This may be OK when
+# deleting a non existing applet or package. 
+enable_trace
+
+# Enables the logging of the execution time of a command.
+enable_timer
+
+# Establish context.
+# Before any communication can by done to any card this command must be executed.
+establish_context
+
+# Connect to card in the reader with readerName "Secure Flash Card 0"
+# If no friendly name is used the first reader in a list will be used.
+card_connect
+
+# Select Issuer Security Domain (ISD) that is part of the Card Manager
+# The AID of the ISD is defined by the smart card manufacturer. 
+# For the PS-100u family the AID is always A000000151000000.
+# This command can also be used to select any application on the card.
+# In this case the AID is defined by the vendor of the application
+select -AID A000000151000000
+
+# Open secure channel
+# A fixed master key 404142434445464748494a4b4c4d4e4f is used for all keys  (MAC, ENC and KEK)
+# If you have a card which uses key derivation you must enable the derivation mode with the -keyDerivation option and you must specify with -key the master (mother) key.
+# -kek_key, -mac_key and -enc_key are not relevant, because they are calculated from the master key. See the sections Options and Key Derivation.
+open_sc -security 1 -keyind 0 -keyver 1 -mac_key 404142434445464748494a4b4c4d4e4f -enc_key 404142434445464748494a4b4c4d4e4f -kek_key 404142434445464748494a4b4c4d4e4f
+
+# Load and installs an applet in one step
+# The parameters -AID -instAID -pkgAID -nvCodeLimit can be detected automatically and the -AID and -instAID is set to the first applet in appletfile.
+# For the sdAID the AID selected with the select command is chosen if not given. Otherwise the default Card Manager / Security Issuer Domain AID is chosen. So usually you do not have to pass it.
+install -file ../src/de/tum/in/securebitcoinwallet/javacardapplet/javacard/javacardapplet.cap -nvDataLimit 500 -instParam 00 -priv 2
+
+# Select the applet.
+select -AID 01020304050607080900
+
+# Disconnect card
+card_disconnect
