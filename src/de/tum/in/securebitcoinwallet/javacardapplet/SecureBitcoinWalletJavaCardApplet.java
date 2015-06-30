@@ -181,7 +181,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 		if (buffer[ISO7816.OFFSET_P1] != PUK_SIZE
 				|| buffer[ISO7816.OFFSET_P2] < PIN_MINIMUM_SIZE
 				|| buffer[ISO7816.OFFSET_P2] > PIN_MAXIMUM_SIZE) {
-			ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+			ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
 		}
 
 		if (!puk.check(buffer, ISO7816.OFFSET_CDATA, buffer[ISO7816.OFFSET_P1])) {
