@@ -29,7 +29,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	/**
 	 * The preset default pin.
 	 */
-	public final static byte[] DEFAULT_PIN = { (byte) 0x01, (byte) 0x02, (byte) 0x03, (byte) 0xa4 };
+	public final static byte[] DEFAULT_PIN = { (byte) 0x01, (byte) 0x02, (byte) 0x03, (byte) 0x04 };
 	
 	/**
 	 * CLA instruction class for Secure Bitcoin Wallet app instructions.
