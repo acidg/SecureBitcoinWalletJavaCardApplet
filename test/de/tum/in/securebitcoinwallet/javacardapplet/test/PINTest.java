@@ -35,8 +35,7 @@ public class PINTest extends AppletTestBase {
 				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
 				AppletInstructions.INS_AUTHENTICATE, 0x00, // P1
 				0x00, // P2
-				(byte) SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN.length, // PIN
-																				// length
+				(byte) SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN.length, 
 				0x01, 0x02, 0x03, 0x04 // Default PIN
 		};
 
@@ -133,14 +132,15 @@ public class PINTest extends AppletTestBase {
 		unlockInstruction[1] = AppletInstructions.INS_UNLOCK;
 		unlockInstruction[2] = SecureBitcoinWalletJavaCardApplet.PUK_SIZE; // P1
 		unlockInstruction[3] = (byte) SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN.length; // P2
-
-		System.arraycopy(puk, 0, unlockInstruction, ISO7816.OFFSET_CDATA, puk.length);
+		unlockInstruction[4] = 0x11;	// Le
+		System.arraycopy(puk, 0, unlockInstruction, ISO7816.OFFSET_CDATA,
+				puk.length);
 		System.arraycopy(SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN, 0,
 				unlockInstruction, ISO7816.OFFSET_CDATA + puk.length,
 				SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN.length);
 
 		assertCommandSuccessful(simulator.transmitCommand(unlockInstruction));
-		
+
 		testCorrectPINValidation();
 	}
 
