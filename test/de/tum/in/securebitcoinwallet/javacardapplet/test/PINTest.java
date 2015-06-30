@@ -30,11 +30,8 @@ public class PINTest extends AppletTestBase {
 				SecureBitcoinWalletJavaCardApplet.INS_AUTHENTICATE,
 				0x00,	// P1
 				0x00,	// P2
-				(byte) SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN.length,	// Lc
-				0x01,
-				0x02,
-				0x03,
-				0x04
+				(byte) SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN.length,	// PIN length
+				0x01, 0x02, 0x03, 0x04	// Default PIN
 		};
 		
 		byte[] response = simulator.transmitCommand(validateCommand);
@@ -55,10 +52,7 @@ public class PINTest extends AppletTestBase {
 				0x00,	// P1
 				0x00,	// P2
 				(byte) SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN.length,	// Lc
-				0x04,
-				0x03,
-				0x02,
-				0x01
+				0x04, 0x03, 0x02, 0x01	// Wrong PIN
 		};
 		
 		short response = Util.getShort(simulator.transmitCommand(validateCommand), (short) 0);
@@ -70,7 +64,7 @@ public class PINTest extends AppletTestBase {
 	
 	
 	/**
-	 * Tests the change pin function.
+	 * Tests the change PIN function.
 	 */
 	@Test
 	public void testPINchange() {
@@ -79,29 +73,21 @@ public class PINTest extends AppletTestBase {
 		byte[] toNewPINChangeCommand = {
 				SecureBitcoinWalletJavaCardApplet.SECURE_BITCOIN_WALLET_CLA,
 				SecureBitcoinWalletJavaCardApplet.INS_CHANGE_PIN,
-				0x00,
-				0x00,
+				0x00,	// P1
+				0x00,	// P2
 				0x07,	// Lc
 				0x06,	// Length of new PIN
-				0x01,	// new PIN
-				0x01,
-				0x01,
-				0x01,
-				0x01,
-				0x01
+				0x01, 0x01, 0x01, 0x01, 0x01, 0x01	// New PIN
 		};
 		
 		byte[] toOldPINChangeCommand = {
 				SecureBitcoinWalletJavaCardApplet.SECURE_BITCOIN_WALLET_CLA,
 				SecureBitcoinWalletJavaCardApplet.INS_CHANGE_PIN,
-				0x00,
-				0x00,
-				0x05,
-				0x04,
-				0x01, 
-				0x02,
-				0x03,
-				0x04
+				0x00,	// P1
+				0x00,	// P2
+				0x05,	// Lc
+				0x04,	// PIN length
+				0x01, 0x02, 0x03, 0x04 // default PIN
 		};
 		
 		byte[] validateNewPINCommand = {
@@ -109,27 +95,24 @@ public class PINTest extends AppletTestBase {
 				SecureBitcoinWalletJavaCardApplet.INS_AUTHENTICATE,
 				0x00,	// P1
 				0x00,	// P2
-				0x06,	// Lc
-				0x01,
-				0x01,
-				0x01,
-				0x01,
-				0x01,
-				0x01
+				0x06,	// Length of new PIN
+				0x01, 0x01, 0x01, 0x01, 0x01, 0x01	// New PIN
 		};
 		
-		short response = Util.getShort(simulator.transmitCommand(toNewPINChangeCommand), (short) 0);
-		String hans = "0x" + String.format("%02X ", response);
-		assertEquals(ISO7816.SW_NO_ERROR, response);
-		response = Util.getShort(simulator.transmitCommand(validateNewPINCommand), (short) 0);
-		hans = "0x" + String.format("%02X ", response);
-		assertEquals(ISO7816.SW_NO_ERROR, response);
+		// Change PIN to 111111
+		byte[] response = simulator.transmitCommand(toNewPINChangeCommand);
+		assertCommandSuccessful(response);
 		
+		// Check PIN
+		response = simulator.transmitCommand(validateNewPINCommand);
+		assertCommandSuccessful(response);
 		assertTrue(checkPINValidated());
 		
-		response = Util.getShort(simulator.transmitCommand(toOldPINChangeCommand), (short) 0);
-		hans = "0x" + String.format("%02X ", response);
-		assertEquals(ISO7816.SW_NO_ERROR, response);
+		// Revert to default PIN 1234
+		response = simulator.transmitCommand(toOldPINChangeCommand);
+		assertCommandSuccessful(response);
+		
+		// Check old PIN 
 		testCorrectPINValidation();
 	}
 
@@ -141,8 +124,8 @@ public class PINTest extends AppletTestBase {
 		byte[] isValidatedCommand = {
 				SecureBitcoinWalletJavaCardApplet.SECURE_BITCOIN_WALLET_CLA,
 				SecureBitcoinWalletJavaCardApplet.INS_PIN_VALIDATED,
-				0x00,
-				0x00
+				0x00,	// P1
+				0x00	// P2
 		};
 		
 		byte[] response = simulator.transmitCommand(isValidatedCommand);
