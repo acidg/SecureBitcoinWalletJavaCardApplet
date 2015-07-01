@@ -51,4 +51,9 @@ public abstract interface AppletInstructions {
 	 * Delete private key instruction.
 	 */
 	public static final byte INS_DELETE_PRIVATE_KEY = (byte) 0xE4;
+	
+	/**
+	 * Get remaining memory instruction.
+	 */
+	public static final byte INS_GET_REMAINING_MEMORY = (byte) 0x28;
 }

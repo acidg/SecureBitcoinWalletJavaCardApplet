@@ -1,10 +1,15 @@
 package de.tum.in.securebitcoinwallet.javacardapplet;
 
+import org.bouncycastle.crypto.KeyGenerationParameters;
+import org.bouncycastle.crypto.generators.RSAKeyPairGenerator;
+
 import javacard.framework.APDU;
 import javacard.framework.Applet;
 import javacard.framework.ISO7816;
 import javacard.framework.ISOException;
+import javacard.framework.JCSystem;
 import javacard.framework.OwnerPIN;
+import javacard.security.Key;
 import javacard.security.RandomData;
 
 /**
@@ -139,6 +144,9 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 			break;
 		case AppletInstructions.INS_DELETE_PRIVATE_KEY:
 			deletePrivateKey(apdu, buffer);
+			break;
+		case AppletInstructions.INS_GET_REMAINING_MEMORY:
+			getRemainingMemory(apdu, buffer);
 			break;
 		default:
 			ISOException.throwIt(ISO7816.SW_INS_NOT_SUPPORTED);
@@ -282,6 +290,19 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 
 	private void deletePrivateKey(APDU apdu, byte[] buffer) {
 		// TODO Auto-generated method stub
+	}
 
+	/**
+	 * Returns the remaining memory in bytes.
+	 */
+	private void getRemainingMemory(APDU apdu, byte[] buffer) {
+		apdu.setIncomingAndReceive();
+		short remainingMemory = JCSystem
+				.getAvailableMemory(JCSystem.MEMORY_TYPE_PERSISTENT);
+		
+		buffer[0] = (byte) (remainingMemory >> 8);
+		buffer[1] = (byte) (remainingMemory & 0xFF);
+		
+		apdu.setOutgoingAndSend((short) 0, (short) 2);
 	}
 }
