@@ -1,13 +1,10 @@
 package de.tum.in.securebitcoinwallet.javacardapplet;
 
-import java.util.Arrays;
-
-import com.licel.jcardsim.crypto.ECPrivateKeyImpl;
-
 import javacard.framework.Util;
 import javacard.security.Key;
 import javacard.security.KeyBuilder;
-import javacard.security.PrivateKey;
+
+import com.licel.jcardsim.crypto.ECPrivateKeyImpl;
 
 /**
  * Storage for private keys. Uses two arrays to store the private key and a
@@ -22,7 +19,7 @@ public class KeyStore {
 	 * Size of a private key in bits. Is 256 for Bitcoin.
 	 */
 	public static short PRIVATE_KEY_SIZE = 256;
-	
+
 	/**
 	 * The store for the private keys. If a key is null, the slot is free and
 	 * can be used for a new key. This should be kept in sync with
@@ -33,9 +30,8 @@ public class KeyStore {
 	/**
 	 * Map to find the key for a specified address. The first dimension is for
 	 * the number, under which the key for the address can be found in the
-	 * {@link keys} array.
-	 * inside the key store. The size of the address is stored in the first byte
-	 * of the addresse's array.
+	 * {@link keys} array. inside the key store. The size of the address is
+	 * stored in the first byte of the addresse's array.
 	 */
 	private byte[][] addressToKeyIndexMap;
 
@@ -48,12 +44,13 @@ public class KeyStore {
 	 * Constructor. Has to be called inside the constructor of the applet to
 	 * reserve needed memory.
 	 * 
-	 * @param storeSize The size of the keystore in keys. Maximum is 254 (0xFE).
-	 *            If a storeSize bigger than 254 is provided, the size will be
-	 *            set to 254.
-	 * @param addressSize The maximum size of an address in bytes. Maximum is
-	 *            254. If the maximum is exceeded, the maximum of 254 is used
-	 *            instead.
+	 * @param storeSize
+	 *            The size of the keystore in keys. Maximum is 254 (0xFE). If a
+	 *            storeSize bigger than 254 is provided, the size will be set to
+	 *            254.
+	 * @param addressSize
+	 *            The maximum size of an address in bytes. Maximum is 254. If
+	 *            the maximum is exceeded, the maximum of 254 is used instead.
 	 */
 	public KeyStore(short storeSize, short addressSize) {
 		addressIndex = 0;
@@ -77,9 +74,12 @@ public class KeyStore {
 	 * Returns the private key for the given address key, or null, if the key
 	 * could not be found.
 	 * 
-	 * @param src The byte array in which the address can be found
-	 * @param addrOff Offset of the address inside the given byte array
-	 * @param addrLength Length of the address
+	 * @param src
+	 *            The byte array in which the address can be found
+	 * @param addrOff
+	 *            Offset of the address inside the given byte array
+	 * @param addrLength
+	 *            Length of the address
 	 */
 	public Key getPrivateKey(byte[] src, short addrOff, short addrLength) {
 		calculateIndexForAddress(src, addrOff, addrLength);
@@ -93,9 +93,12 @@ public class KeyStore {
 	/**
 	 * Returns the index of the key for the given address.
 	 * 
-	 * @param src The byte array in which the address can be found
-	 * @param addrOff Offset of the address inside the given byte array
-	 * @param addrLength Length of the address
+	 * @param src
+	 *            The byte array in which the address can be found
+	 * @param addrOff
+	 *            Offset of the address inside the given byte array
+	 * @param addrLength
+	 *            Length of the address
 	 */
 	private void calculateIndexForAddress(byte[] src, short addrOff,
 			short addrLength) {
@@ -113,17 +116,20 @@ public class KeyStore {
 	/**
 	 * Stores the given private key in the key store.
 	 * 
-	 * @param src The byte array, in which the address and private key can
-	 *            be
+	 * @param src
+	 *            The byte array, in which the address and private key can be
 	 *            found.
-	 * @param addrOff Offset for the address inside the byte array
-	 * @param addrLength Length of the address
-	 * @param keyOff Offset of the private key inside the byte array
-	 * @param keyLength Length of the private key
+	 * @param addrOff
+	 *            Offset for the address inside the byte array
+	 * @param addrLength
+	 *            Length of the address
+	 * @param keyOff
+	 *            Offset of the private key inside the byte array
+	 * @param keyLength
+	 *            Length of the private key
 	 * 
-	 * @return True, if the key could be saved, false if the store is full,
-	 *         the address is too long or the address is already in the key
-	 *         store.
+	 * @return True, if the key could be saved, false if the store is full, the
+	 *         address is too long or the address is already in the key store.
 	 */
 	public boolean putPrivateKey(byte[] src, short addrOff, byte addrLength,
 			short keyOff, byte keyLength) {
@@ -134,25 +140,34 @@ public class KeyStore {
 		}
 
 		// Store private key to keys array of this key store
-		keys[addressIndex] = new ECPrivateKeyImpl(KeyBuilder.TYPE_EC_FP_PRIVATE, PRIVATE_KEY_SIZE);
+		keys[addressIndex] = new ECPrivateKeyImpl(
+				KeyBuilder.TYPE_EC_FP_PRIVATE, PRIVATE_KEY_SIZE);
 
+		// Add length of address to mapping array
 		addressToKeyIndexMap[addressIndex][0] = addrLength;
-		Util.arrayCopy(address, (byte) 0, addressToKeyIndexMap[addressIndex],
-				(byte) 1, (byte) address.length);
+		// Add mapping
+		Util.arrayCopy(src, (byte) addrOff, addressToKeyIndexMap[addressIndex],
+				(byte) 1, addrLength);
 		return true;
 	}
 
 	/**
-	 * Deletes the private key for the given address.
+	 * Deletes the private key for the given address. If the key could not be
+	 * found, nothing is done.
 	 * 
-	 * @param address The bitcoin address, for which the private key should be
-	 *            deleted.
+	 * @param src
+	 *            The byte array, in which the address and private key can be
+	 *            found.
+	 * @param addrOff
+	 *            Offset for the address inside the byte array
+	 * @param addrLength Length of the address
 	 */
-	public void removePrivateKey(byte[] address) {
-		addressIndex = findFirstFreePosition();
+	public void removePrivateKey(byte[] src, short addrOff, short addrLength) {
+		calculateIndexForAddress(src, addrOff, addrLength);
 		if (addressIndex != 0xFF) {
 			Util.arrayFillNonAtomic(addressToKeyIndexMap[addressIndex],
-					(short) 0, (short) addressToKeyIndexMap[addressIndex].length, (byte) 0);
+					(short) 0,
+					(short) addressToKeyIndexMap[addressIndex].length, (byte) 0);
 			keys[addressIndex] = null;
 		}
 	}

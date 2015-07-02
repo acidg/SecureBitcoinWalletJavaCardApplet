@@ -11,10 +11,10 @@ import javacard.security.RandomData;
 
 /**
  * This is the SecureBitcoinWallet Applet. It stores the users private keys in a
- * map of bitcoin address to encrypted private key.
- * To access the key store, a pin is required which is set during setup. If the
- * PIN is entered wrong too many times, the card is locked and can only be
- * unlocked, if the PUK is provided.
+ * map of bitcoin address to encrypted private key. To access the key store, a
+ * pin is required which is set during setup. If the PIN is entered wrong too
+ * many times, the card is locked and can only be unlocked, if the PUK is
+ * provided.
  * 
  * @author Benedikt Schlagberger
  */
@@ -67,8 +67,8 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	private boolean setupDone = false;
 
 	/**
-	 * PUK to authorize administrative operations like a pin reset if the
-	 * retry limit is reached.
+	 * PUK to authorize administrative operations like a pin reset if the retry
+	 * limit is reached.
 	 */
 	private OwnerPIN puk;
 
@@ -90,7 +90,6 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 		pin = new OwnerPIN(PIN_RETRIES, PIN_MAXIMUM_SIZE);
 		pin.update(DEFAULT_PIN, (byte) 0, (byte) DEFAULT_PIN.length);
 
-		// 50 keys,
 		keyStore = new KeyStore(STORE_SIZE, ADDRESS_SIZE);
 
 		register();
@@ -99,9 +98,12 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	/**
 	 * Installs this applet.
 	 *
-	 * @param bArray The array containing installation parameters
-	 * @param bOffset The starting offset in bArray
-	 * @param bLength The length in bytes of the parameter data in bArray
+	 * @param bArray
+	 *            The array containing installation parameters
+	 * @param bOffset
+	 *            The starting offset in bArray
+	 * @param bLength
+	 *            The length in bytes of the parameter data in bArray
 	 */
 	public static void install(byte bArray[], short bOffset, byte bLength)
 			throws ISOException {
@@ -111,7 +113,8 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	/**
 	 * Processes APDU commands from the host.
 	 * 
-	 * @param apdu The APDU command to process.
+	 * @param apdu
+	 *            The APDU command to process.
 	 */
 	@Override
 	public void process(APDU apdu) throws ISOException {
@@ -169,9 +172,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	/**
 	 * Setup of the card. Generates and returns the PUK to reset the PIN.
 	 * 
-	 * INS: 0x02
-	 * P1: 0x00
-	 * P2: 0x00
+	 * INS: 0x02 P1: 0x00 P2: 0x00
 	 * 
 	 * Return: The generated PUK
 	 */
@@ -192,11 +193,8 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	/**
 	 * Unlocks the card, if the PIN has been entered wrong too many times.
 	 * 
-	 * INS: 0x04
-	 * P1: PUK length
-	 * P2: new PIN length
-	 * Lc: total length in bytes (P1 + P2)
-	 * Data: PUK and new PIN
+	 * INS: 0x04 P1: PUK length P2: new PIN length Lc: total length in bytes (P1
+	 * + P2) Data: PUK and new PIN
 	 */
 	private void unlock(APDU apdu, byte[] buffer) {
 		if (buffer[ISO7816.OFFSET_P1] != PUK_SIZE
@@ -218,11 +216,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	/**
 	 * Authenticates the user via the pin.
 	 * 
-	 * INS: 0x04
-	 * P1: 0x00
-	 * P2: 0x00
-	 * Lc: PIN length in bytes
-	 * Data: PIN itself
+	 * INS: 0x04 P1: 0x00 P2: 0x00 Lc: PIN length in bytes Data: PIN itself
 	 */
 	private void authenticate(APDU apdu, byte[] buffer) {
 		pin.reset();
@@ -248,11 +242,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	/**
 	 * Changes the PIN. The User has to be authenticated.
 	 * 
-	 * INS: 0x06
-	 * P1: 0x00
-	 * P2: 0x00
-	 * Lc: length of PIN
-	 * Data: PIN istself
+	 * INS: 0x06 P1: 0x00 P2: 0x00 Lc: length of PIN Data: PIN istself
 	 */
 	private void changePin(APDU apdu, byte[] buffer) {
 		if (!pin.isValidated()) {
@@ -263,7 +253,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 
 		byte pin_size = buffer[ISO7816.OFFSET_LC];
 
-		if (pin_size < 4) {
+		if (isStrictlyLessThanUnsigned(pin_size, (byte) 4)) {
 			ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
 		}
 
@@ -280,11 +270,8 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	/**
 	 * Stores the given private key encrypted in the EEPROM.
 	 * 
-	 * INS: 0xD8
-	 * P1: length of address in bytes
-	 * P2: length of private key in
-	 * bytes Lc: total length
-	 * Data: address and private key
+	 * INS: 0xD8 P1: length of address in bytes P2: length of private key in
+	 * bytes Lc: total length Data: address and private key
 	 * 
 	 * Return: The address for which the key is stored, if the operation was
 	 * successful.
@@ -320,5 +307,17 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 		buffer[1] = (byte) (remainingMemory & 0xFF);
 
 		apdu.setOutgoingAndSend((short) 0, (short) 2);
+	}
+
+	/**
+	 * Compares the given bytes for value. Used because bytes are always
+	 * unsigned in Java.
+	 * 
+	 * @param n1 The first byte
+	 * @param n2 The second byte
+	 * @return True, if the first byte is smaller than the second one, false otherwise.
+	 */
+	public static boolean isStrictlyLessThanUnsigned(byte n1, byte n2) {
+		return (n1 < n2) ^ ((n1 < 0) != (n2 < 0));
 	}
 }
