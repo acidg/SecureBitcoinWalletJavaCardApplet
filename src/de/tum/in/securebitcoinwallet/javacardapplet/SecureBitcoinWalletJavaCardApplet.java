@@ -1,15 +1,12 @@
 package de.tum.in.securebitcoinwallet.javacardapplet;
 
-import org.bouncycastle.crypto.KeyGenerationParameters;
-import org.bouncycastle.crypto.generators.RSAKeyPairGenerator;
-
 import javacard.framework.APDU;
 import javacard.framework.Applet;
 import javacard.framework.ISO7816;
 import javacard.framework.ISOException;
 import javacard.framework.JCSystem;
 import javacard.framework.OwnerPIN;
-import javacard.security.Key;
+import javacard.framework.Util;
 import javacard.security.RandomData;
 
 /**
@@ -54,6 +51,17 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 			(byte) 0x03, (byte) 0x04 };
 
 	/**
+	 * The size of the {@link KeyStore} of this applet in number of keys.
+	 */
+	public final static byte STORE_SIZE = (byte) 0x32;
+
+	/**
+	 * Maximum size of an address in bytes. 39 alpha numeric characters (e.g.
+	 * ascii)
+	 */
+	public final static byte ADDRESS_SIZE = (byte) 0x24;
+
+	/**
 	 * For the setup function which should only be called once.
 	 */
 	private boolean setupDone = false;
@@ -69,6 +77,8 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 */
 	private OwnerPIN pin;
 
+	private KeyStore keyStore;
+
 	/**
 	 * Constructor. Should initialize needed memory to prevent out of memory
 	 * during runtime. Only this class's install method should create the applet
@@ -79,6 +89,9 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 
 		pin = new OwnerPIN(PIN_RETRIES, PIN_MAXIMUM_SIZE);
 		pin.update(DEFAULT_PIN, (byte) 0, (byte) DEFAULT_PIN.length);
+
+		// 50 keys,
+		keyStore = new KeyStore(STORE_SIZE, ADDRESS_SIZE);
 
 		register();
 	}
@@ -281,6 +294,9 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 			ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
 		}
 
+		if (((short) (buffer[ISO7816.OFFSET_P1] & 0xFF)) > ((short) ADDRESS_SIZE & 0xFF)) {
+			ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
+		}
 	}
 
 	private void getPrivateKey(APDU apdu, byte[] buffer) {
@@ -299,10 +315,10 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 		apdu.setIncomingAndReceive();
 		short remainingMemory = JCSystem
 				.getAvailableMemory(JCSystem.MEMORY_TYPE_PERSISTENT);
-		
+
 		buffer[0] = (byte) (remainingMemory >> 8);
 		buffer[1] = (byte) (remainingMemory & 0xFF);
-		
+
 		apdu.setOutgoingAndSend((short) 0, (short) 2);
 	}
 }
