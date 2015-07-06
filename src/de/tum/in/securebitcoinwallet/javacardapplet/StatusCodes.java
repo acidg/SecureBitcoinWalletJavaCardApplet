@@ -16,4 +16,10 @@ public abstract interface StatusCodes {
 	 * wrong to many times.
 	 */
 	public final static short SW_CARD_LOCKED = (short) 0x6983;
+
+	/**
+	 * Used to indicate an error because the given bitcoin address had the wrong
+	 * length.
+	 */
+	public final static short WRONG_ADDRESS_LENGTH = (short) 0x0003;
 }

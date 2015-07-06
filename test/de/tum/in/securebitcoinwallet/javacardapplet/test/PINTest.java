@@ -132,7 +132,7 @@ public class PINTest extends AppletTestBase {
 		unlockInstruction[1] = AppletInstructions.INS_UNLOCK;
 		unlockInstruction[2] = SecureBitcoinWalletJavaCardApplet.PUK_SIZE; // P1
 		unlockInstruction[3] = (byte) SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN.length; // P2
-		unlockInstruction[4] = 0x11;	// Le
+		unlockInstruction[4] = 0x0C;	// Le
 		System.arraycopy(puk, 0, unlockInstruction, ISO7816.OFFSET_CDATA,
 				puk.length);
 		System.arraycopy(SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN, 0,

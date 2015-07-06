@@ -4,11 +4,11 @@ import static org.junit.Assert.assertEquals;
 
 import java.util.Arrays;
 
+import org.bouncycastle.util.encoders.Hex;
+
 import javacard.framework.AID;
 import javacard.framework.ISO7816;
 import javacard.framework.Util;
-
-import org.bouncycastle.util.encoders.Hex;
 
 import com.licel.jcardsim.base.Simulator;
 

@@ -5,7 +5,7 @@ package de.tum.in.securebitcoinwallet.javacardapplet;
  * 
  * @author Benedikt Schlagberger
  */
-public interface SECP256K1 {
+public abstract class SECP256K1 {
 	// Bitcoin: default parameters for EC curve secp256k1
 	public final static byte[] P = { (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
 			(byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,

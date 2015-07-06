@@ -38,6 +38,11 @@ public abstract interface AppletInstructions {
 	public static final byte INS_PIN_VALIDATED = (byte) 0x08;
 
 	/**
+	 * Sign Bitcoin transaction instruction.
+	 */
+	public static final byte INS_SIGN_TRANSACTION = (byte) 0xAB;
+	
+	/**
 	 * Put private key instruction.
 	 */
 	public static final byte INS_PUT_PRIVATE_KEY = (byte) 0xD8;
@@ -51,7 +56,7 @@ public abstract interface AppletInstructions {
 	 * Delete private key instruction.
 	 */
 	public static final byte INS_DELETE_PRIVATE_KEY = (byte) 0xE4;
-	
+
 	/**
 	 * Get remaining memory instruction.
 	 */
