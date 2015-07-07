@@ -1,6 +1,9 @@
 package de.tum.in.securebitcoinwallet.javacardapplet;
 
+import com.licel.jcardsim.crypto.ECPrivateKeyImpl;
+
 import javacard.framework.CardRuntimeException;
+import javacard.framework.Util;
 import javacard.security.AESKey;
 import javacard.security.ECPrivateKey;
 import javacard.security.ECPublicKey;
@@ -8,6 +11,7 @@ import javacard.security.KeyBuilder;
 import javacard.security.KeyPair;
 import javacard.security.MessageDigest;
 import javacard.security.RandomData;
+import javacard.security.Signature;
 import javacardx.crypto.Cipher;
 
 /**
@@ -135,6 +139,25 @@ public class KeyStore {
 
 		keyPair = new KeyPair(KeyPair.ALG_EC_FP, KeyBuilder.LENGTH_EC_FP_256);
 
+		// Set EC params
+		ECPrivateKey privKey = (ECPrivateKey) keyPair.getPrivate();
+
+		privKey.setFieldFP(SECP256K1.P, (short) 0, (short) SECP256K1.P.length);
+		privKey.setA(SECP256K1.a, (short) 0, (short) SECP256K1.a.length);
+		privKey.setB(SECP256K1.b, (short) 0, (short) SECP256K1.b.length);
+		privKey.setG(SECP256K1.G, (short) 0, (short) SECP256K1.G.length);
+		privKey.setR(SECP256K1.R, (short) 0, (short) SECP256K1.R.length);
+		privKey.setK(SECP256K1.K);
+
+		ECPublicKey pubKey = (ECPublicKey) keyPair.getPublic();
+
+		pubKey.setFieldFP(SECP256K1.P, (short) 0, (short) SECP256K1.P.length);
+		pubKey.setA(SECP256K1.a, (short) 0, (short) SECP256K1.a.length);
+		pubKey.setB(SECP256K1.b, (short) 0, (short) SECP256K1.b.length);
+		pubKey.setG(SECP256K1.G, (short) 0, (short) SECP256K1.G.length);
+		pubKey.setR(SECP256K1.R, (short) 0, (short) SECP256K1.R.length);
+		pubKey.setK(SECP256K1.K);
+
 		keys = new EncryptedPrivateKey[storeSize];
 
 		sha256Digest = MessageDigest.getInstance(MessageDigest.ALG_SHA_256,
@@ -157,7 +180,8 @@ public class KeyStore {
 	}
 
 	/**
-	 * Signs the given message with the key of the given Bitcoin address.
+	 * Signs the given message with the key of the given Bitcoin address. Input
+	 * and output buffer may overlap.
 	 * 
 	 * @param src The buffer, in which the address and message can be found
 	 * @param addrOff The offset of the Bitcoin address inside the buffer
@@ -171,12 +195,28 @@ public class KeyStore {
 	 */
 	public short signMessage(byte[] src, short addrOff, short addrLength,
 			short msgOff, short msgLength, byte[] dest, short destOff) {
-		// TODO implement
-		return 0;
+
+		calculateIndexForAddress(src, addrOff, addrLength);
+
+		if (addressIndex == (short) 0xff) {
+			CardRuntimeException.throwIt(StatusCodes.KEYSTORE_FULL);
+		}
+
+		short keyLength = decryptPrivateKey(keys[addressIndex], keyBuffer,
+				(short) 0);
+
+		ECPrivateKey privateKey = (ECPrivateKey) keyPair.getPrivate();
+		privateKey.setS(keyBuffer, (short) 0, keyLength);
+
+		Signature signature = Signature.getInstance(Signature.ALG_HMAC_SHA_256,
+				false);
+		signature.init(privateKey, Signature.MODE_SIGN);
+
+		return signature.sign(src, msgOff, msgLength, dest, destOff);
 	}
 
 	/**
-	 * Generates a new key pair and returns the public key if the stroe has
+	 * Generates a new key pair and returns the public key if the store has
 	 * space left. Stores the private key in this {@link KeyStore}.
 	 * 
 	 * @param dest The output buffer where the new public key will bew
@@ -192,27 +232,10 @@ public class KeyStore {
 			CardRuntimeException.throwIt(StatusCodes.KEYSTORE_FULL);
 		}
 
-		// Set EC params TODO: Move to constructor?
-		ECPrivateKey privKey = (ECPrivateKey) keyPair.getPrivate();
-
-		privKey.setFieldFP(SECP256K1.P, (short) 0, (short) SECP256K1.P.length);
-		privKey.setA(SECP256K1.a, (short) 0, (short) SECP256K1.a.length);
-		privKey.setB(SECP256K1.b, (short) 0, (short) SECP256K1.b.length);
-		privKey.setG(SECP256K1.G, (short) 0, (short) SECP256K1.G.length);
-		privKey.setR(SECP256K1.R, (short) 0, (short) SECP256K1.R.length);
-		privKey.setK(SECP256K1.K);
-
-		ECPublicKey pubKey = (ECPublicKey) keyPair.getPublic();
-
-		pubKey.setFieldFP(SECP256K1.P, (short) 0, (short) SECP256K1.P.length);
-		pubKey.setA(SECP256K1.a, (short) 0, (short) SECP256K1.a.length);
-		pubKey.setB(SECP256K1.b, (short) 0, (short) SECP256K1.b.length);
-		pubKey.setG(SECP256K1.G, (short) 0, (short) SECP256K1.G.length);
-		pubKey.setR(SECP256K1.R, (short) 0, (short) SECP256K1.R.length);
-		pubKey.setK(SECP256K1.K);
-
 		// Generate the keys
 		keyPair.genKeyPair();
+
+		ECPublicKey pubKey = (ECPublicKey) keyPair.getPublic();
 
 		// Calculate the key's Bitcoin address, the address is stored in
 		// keyBuffer
@@ -223,7 +246,8 @@ public class KeyStore {
 				addressLength);
 
 		// Encrypt private key
-		short keyLength = encryptPrivateKey(privKey, keyBuffer, (short) 0);
+		short keyLength = encryptPrivateKey(
+				(ECPrivateKey) keyPair.getPrivate(), keyBuffer, (short) 0);
 
 		// Store private key in this KeyStore
 		keys[addressIndex].setKey(keyBuffer, (short) 0, keyLength);
@@ -369,14 +393,36 @@ public class KeyStore {
 	 * 
 	 * @param privateKey The private key to encrypt
 	 * @param dest The destination, where the encrypted key is put
-	 * @param destOff Th offset inside the destination array
-	 * @return The legth of the encrypted key.
+	 * @param destOff The offset inside the destination array
+	 * 
+	 * @return The length of the encrypted key.
 	 */
 	private short encryptPrivateKey(ECPrivateKey privateKey, byte[] dest,
 			short destOff) {
 		short keyLength = privateKey.getS(encryptionBuffer, (short) 0);
 
 		aesCipher.init(aesKey, Cipher.MODE_ENCRYPT);
+		aesCipher
+				.doFinal(encryptionBuffer, (short) 0, keyLength, dest, destOff);
+
+		return destOff;
+	}
+
+	/**
+	 * Decrypts the given private key with the AES key of this store.</br>
+	 * Uses {@link #encryptionBuffer}
+	 * 
+	 * @param privateKey The private key to decrypt
+	 * @param dest The destination, where the decrypted key is put
+	 * @param destOff The offset inside the destination array
+	 * 
+	 * @return The length of the decrypted key.
+	 */
+	private short decryptPrivateKey(EncryptedPrivateKey privateKey,
+			byte[] dest, short destOff) {
+		short keyLength = privateKey.getKey(encryptionBuffer, (short) 0);
+
+		aesCipher.init(aesKey, Cipher.MODE_DECRYPT);
 		aesCipher
 				.doFinal(encryptionBuffer, (short) 0, keyLength, dest, destOff);
 
