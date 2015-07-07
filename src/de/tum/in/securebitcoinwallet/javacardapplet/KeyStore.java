@@ -40,6 +40,11 @@ public class KeyStore {
 	 * {@link #addressToKeyIndexMap}.
 	 */
 	private EncryptedPrivateKey[] keys;
+	
+	/**
+	 * The current number of registered keys.
+	 */
+	private short numberOfKeys;
 
 	/**
 	 * Map to find the key for a specified address. Maps addresses to the index
@@ -159,14 +164,13 @@ public class KeyStore {
 	 *            written.
 	 * @param destOff The offset inside the output buffer.
 	 * 
-	 * @return The length of the new public key in bytes or 0 if the store is
-	 *         full.
+	 * @return The length of the new public key in bytes.
 	 */
 	public short generateKeyPair(byte[] dest, short destOff) {
 		findFirstFreePosition();
 
 		if (addressIndex == 0xFF) {
-			return 0;
+			CardRuntimeException.throwIt(StatusCodes.KEYSTORE_FULL);
 		}
 
 		// Set EC params TODO: Move to constructor?
@@ -219,7 +223,7 @@ public class KeyStore {
 	 * @param keyOff Offset of the private key inside the byte array
 	 * @param keyLength Length of the private key
 	 */
-	public void putPrivateKey(byte[] src, short addrOff, byte addrLength,
+	public void importPrivateKey(byte[] src, short addrOff, byte addrLength,
 			short keyOff, byte keyLength) {
 		findFirstFreePosition();
 		if (addressIndex == 0xFF) {
@@ -276,6 +280,37 @@ public class KeyStore {
 		}
 	}
 
+	/**
+	 * Calculates the current amount of registered private keys.
+	 * 
+	 * @return The current amount of registered private keys in this KeyStore
+	 */
+	public short getNumberOfKeys() {
+		numberOfKeys = 0;
+		
+		for (EncryptedPrivateKey key : keys) {
+			if (key.inUse) {
+				numberOfKeys++;
+			}
+		}
+		
+		return numberOfKeys;
+	}
+	
+	/**
+	 * Calculates the amount of free key slots.
+	 */
+	public short getNumberofKeysRemaining() {
+		return (short) (keys.length - getNumberOfKeys());
+	}
+	
+	/**
+	 * Whether this KeyStore is full.
+	 */
+	public boolean isFull() {
+		return getNumberOfKeys() == keys.length;
+	}
+	
 	/**
 	 * Calculates the index of the key for the given address in
 	 * {@link #addressIndex}.
