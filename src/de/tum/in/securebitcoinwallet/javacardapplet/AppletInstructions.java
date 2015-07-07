@@ -45,6 +45,7 @@ public abstract interface AppletInstructions {
 	/**
 	 * Sign Bitcoin transaction instruction.
 	 */
+	@Deprecated
 	public static final byte INS_SIGN_TRANSACTION = (byte) 0xAB;
 
 	/**

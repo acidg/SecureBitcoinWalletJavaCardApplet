@@ -84,7 +84,7 @@ public class KeyStore {
 	 * Signature used to sign messages.
 	 */
 	private Signature signature;
-	
+
 	/**
 	 * Digest used for hashing with SHA256.
 	 */
@@ -200,7 +200,7 @@ public class KeyStore {
 		calculateIndexForAddress(src, addrOff, addrLength);
 
 		selectedAddress = addressIndex;
-		
+
 		if (addressIndex == 0xFF) {
 			CardRuntimeException.throwIt(StatusCodes.KEY_NOT_FOUND);
 		}
@@ -213,11 +213,12 @@ public class KeyStore {
 	 * @param msgOffset The offset if the data inside the buffer
 	 * @param msgLength The length of the data to sign
 	 */
+	@Deprecated
 	public void signMessageInit(byte[] src, short msgOffset, short msgLength) {
 		signature = Signature.getInstance(Signature.ALG_HMAC_SHA_256, false);
 		signature.init(keyPair.getPrivate(), Signature.ALG_HMAC_SHA_256);
 	}
-	
+
 	/**
 	 * Updates the signature with additional data.
 	 * 
@@ -225,10 +226,11 @@ public class KeyStore {
 	 * @param msgOffset The offset if the data inside the buffer
 	 * @param msgLength The length of the data to sign
 	 */
+	@Deprecated
 	public void signMessageUpdate(byte[] src, short msgOffset, short msgLength) {
-		
+
 	}
-	
+
 	/**
 	 * Finalizes the signature with the last chunk data.
 	 * 
@@ -236,12 +238,15 @@ public class KeyStore {
 	 * @param msgOffset The offset if the data inside the buffer
 	 * @param msgLength The length of the data to sign
 	 */
-	public short signMessageFinal(byte[] src, short msgOffset, short msgLength, byte[] dest, short destOff) {
+	@Deprecated
+	public short signMessageFinal(byte[] src, short msgOffset, short msgLength,
+			byte[] dest, short destOff) {
 		return 0;
 	}
 
 	/**
-	 * Signs the given sha256Hash with the key of the previously selected private key. Input
+	 * Signs the given sha256Hash with the key of the previously selected
+	 * private key. Input
 	 * and output buffer may overlap.
 	 * 
 	 * @param src The buffer, in which the sha256Hash can be found
@@ -252,7 +257,8 @@ public class KeyStore {
 	 * 
 	 * @return Length of the signed message inside the output buffer
 	 */
-	public short signMessage(byte[] src, short msgOff, short msgLength, byte[] dest, short destOff) {
+	public short signMessage(byte[] src, short msgOff, short msgLength,
+			byte[] dest, short destOff) {
 
 		if (selectedAddress == (short) 0xFF) {
 			CardRuntimeException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
@@ -328,13 +334,17 @@ public class KeyStore {
 		if (addressIndex == 0xFF) {
 			CardRuntimeException.throwIt(StatusCodes.KEYSTORE_FULL);
 		}
-		if (addrLength > addressToKeyIndexMap[0].getSize()) {
+		if ((short) (addrLength & 0xFF) > BitcoinAddress.MAX_ADDRESS_LENGTH) {
 			CardRuntimeException.throwIt(StatusCodes.WRONG_ADDRESS_LENGTH);
 		}
 
 		addressToKeyIndexMap[addressIndex].setAddress(src, addrOff, addrLength);
 
+		// Encrypt imported key and store in keys
 		aesCipher.init(aesKey, AES_ENCRYPTION_MODE);
+		short encryptedKeyLength = aesCipher.doFinal(src, keyOff, keyLength,
+				keyBuffer, (short) 0);
+		keys[addressIndex].setKey(keyBuffer, (short) 0 , encryptedKeyLength);
 	}
 
 	/**
@@ -420,11 +430,11 @@ public class KeyStore {
 	 */
 	private void calculateIndexForAddress(byte[] src, short addrOff,
 			short addrLength) {
-		
+
 		if ((addrLength & 0xFF) > 0xFF) {
 			CardRuntimeException.throwIt(StatusCodes.WRONG_ADDRESS_LENGTH);
 		}
-		
+
 		for (addressIndex = 0; addressIndex < addressToKeyIndexMap.length; addressIndex++) {
 			if (addressToKeyIndexMap[addressIndex].equalsAddress(src, addrOff,
 					addrLength)) {

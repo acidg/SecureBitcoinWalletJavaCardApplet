@@ -1,4 +1,4 @@
-package de.tum.in.securebitcoinwallet.javacardapplet.test;
+package de.tum.in.securebitcoinwallet.javacardapplet.test.tests;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -33,15 +33,16 @@ public class PINTest extends AppletTestBase {
 	public void testCorrectPINValidation() {
 		byte[] validateCommand = {
 				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
-				AppletInstructions.INS_AUTHENTICATE, 0x00, // P1
+				AppletInstructions.INS_AUTHENTICATE,
+				0x00, // P1
 				0x00, // P2
-				(byte) SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN.length, 
+				(byte) SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN.length,
 				0x01, 0x02, 0x03, 0x04 // Default PIN
 		};
 
 		byte[] response = simulator.transmitCommand(validateCommand);
 
-		assertCommandSuccessful(response);
+		assertTrue(commandSuccessful(response));
 
 		assertTrue(checkPINValidated());
 	}
@@ -93,16 +94,16 @@ public class PINTest extends AppletTestBase {
 
 		// Change PIN to 111111
 		byte[] response = simulator.transmitCommand(toNewPINChangeCommand);
-		assertCommandSuccessful(response);
+		assertTrue(commandSuccessful(response));
 
 		// Check PIN
 		response = simulator.transmitCommand(validateNewPINCommand);
-		assertCommandSuccessful(response);
+		assertTrue(commandSuccessful(response));
 		assertTrue(checkPINValidated());
 
 		// Revert to default PIN 1234
 		response = simulator.transmitCommand(toOldPINChangeCommand);
-		assertCommandSuccessful(response);
+		assertTrue(commandSuccessful(response));
 
 		// Check old PIN
 		testCorrectPINValidation();
@@ -132,14 +133,15 @@ public class PINTest extends AppletTestBase {
 		unlockInstruction[1] = AppletInstructions.INS_UNLOCK;
 		unlockInstruction[2] = SecureBitcoinWalletJavaCardApplet.PUK_SIZE; // P1
 		unlockInstruction[3] = (byte) SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN.length; // P2
-		unlockInstruction[4] = 0x0C;	// Le
+		unlockInstruction[4] = 0x0C; // Le
 		System.arraycopy(puk, 0, unlockInstruction, ISO7816.OFFSET_CDATA,
 				puk.length);
 		System.arraycopy(SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN, 0,
 				unlockInstruction, ISO7816.OFFSET_CDATA + puk.length,
 				SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN.length);
 
-		assertCommandSuccessful(simulator.transmitCommand(unlockInstruction));
+		assertTrue(commandSuccessful(simulator
+				.transmitCommand(unlockInstruction)));
 
 		testCorrectPINValidation();
 	}
@@ -158,7 +160,7 @@ public class PINTest extends AppletTestBase {
 
 		byte[] response = simulator.transmitCommand(isValidatedCommand);
 
-		assertCommandSuccessful(response);
+		assertTrue(commandSuccessful(response));
 
 		return response[0] == 1 ? true : false;
 	}

@@ -1,4 +1,4 @@
-package de.tum.in.securebitcoinwallet.javacardapplet.test;
+package de.tum.in.securebitcoinwallet.javacardapplet.test.tests;
 
 import org.junit.Test;
 
@@ -15,6 +15,6 @@ public class UtilTest extends AppletTestBase {
 		
 		byte[] response = simulator.transmitCommand(apdu);
 		
-		assertCommandSuccessful(response);
+		commandSuccessful(response);
 	}
 }

@@ -10,7 +10,7 @@ import javacard.framework.Util;
  *
  */
 public class BitcoinAddress {
-	private static short MAX_ADDRESS_LENGTH = 255;
+	public static short MAX_ADDRESS_LENGTH = 255;
 
 	/**
 	 * Byte array holding the address.

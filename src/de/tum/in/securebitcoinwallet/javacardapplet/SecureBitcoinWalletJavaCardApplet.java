@@ -371,6 +371,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * Return: The signature, if P1 is set to final.
 	 * </pre>
 	 */
+	@Deprecated
 	private void signTransaction(APDU apdu, byte[] buffer) {
 		if (!pin.isValidated()) {
 			ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
@@ -446,7 +447,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * INS:	0xD8
 	 * P1:	length of address in bytes
 	 * P2:	length of private key in bytes
-	 * Lc:	total length Data: address and private key
+	 * Lc:	total length
 	 * Data:	[address + privateKey]
 	 * 
 	 * Return: The address for which the key is stored, if the operation was
