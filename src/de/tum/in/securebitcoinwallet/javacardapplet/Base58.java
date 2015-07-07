@@ -49,13 +49,13 @@ public class Base58 {
             if (scratch[(short)(scratchOffset + startAt)] == 0) {
                 ++startAt;
             }
-            out[(short)(outOffset + --j)] = (byte)ALPHABET[remainder];            
+            out[(short)(outOffset + --j)] = ALPHABET[remainder];            
         }
         while ((j < ((short)(2 * inLength))) && (out[(short)(outOffset + j)] == ALPHABET[0])) {
             ++j;
         }
         while (--zeroCount >= 0) {
-            out[(short)(outOffset + --j)] = (byte)ALPHABET[0];
+            out[(short)(outOffset + --j)] = ALPHABET[0];
         }
         short resultLength = (short)((2 * inLength) - j);
         Util.arrayCopyNonAtomic(out, (short)(outOffset + j), out, outOffset, resultLength);
