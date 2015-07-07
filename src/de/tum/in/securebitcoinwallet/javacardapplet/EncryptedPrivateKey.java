@@ -3,6 +3,11 @@ package de.tum.in.securebitcoinwallet.javacardapplet;
 import javacard.framework.CardRuntimeException;
 import javacard.framework.Util;
 
+/**
+ * Wrapper for encrypted private keys. 
+ * 
+ * @author Benedikt Schlagberger
+ */
 public class EncryptedPrivateKey {
 
 	/**
