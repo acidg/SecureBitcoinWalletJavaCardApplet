@@ -32,22 +32,24 @@ public class BitcoinAddress {
 	 * 
 	 * @param src The array, in which the address can be found
 	 * @param addrOff The offset of the address inside the source array
-	 * @param addrLength The length of the address
+	 * @param addrLength The length of the address (may not exceed 254 bytes).
 	 */
-	public void setAddress(byte[] src, short addrOff, byte addrLength) {
-		if ((short) (0xFF & addrLength) > (short) (addressBytes.length - 1)) {
+	public void setAddress(byte[] src, short addrOff, short addrLength) {
+		if (addrLength > 254
+				|| (short) (0xFF & addrLength) > (short) (addressBytes.length - 1)) {
 			CardRuntimeException.throwIt(StatusCodes.WRONG_ADDRESS_LENGTH);
 		}
 
-		addressBytes[0] = addrLength;
+		addressBytes[0] = (byte) (addrLength & 0xFF);
 		Util.arrayCopy(src, (byte) addrOff, addressBytes, (byte) 1, addrLength);
 	}
-	
+
 	/**
 	 * Deletes the contents of this address.
 	 */
 	public void delete() {
-		Util.arrayFillNonAtomic(addressBytes, (short) 0, (short) addressBytes.length, (byte) 0);
+		Util.arrayFillNonAtomic(addressBytes, (short) 0,
+				(short) addressBytes.length, (byte) 0);
 	}
 
 	/**
@@ -56,7 +58,7 @@ public class BitcoinAddress {
 	private boolean isInUse() {
 		return addressBytes[0] != 0;
 	}
-	
+
 	/**
 	 * Checks whether the given address equals this BitcoinAddress.
 	 * 
@@ -70,7 +72,7 @@ public class BitcoinAddress {
 		if (!isInUse()) {
 			return false;
 		}
-		
+
 		if ((short) (addressBytes[0] & 0xFF) != addrLength) {
 			return false;
 		}
@@ -78,7 +80,7 @@ public class BitcoinAddress {
 		return Util.arrayCompare(src, addrOff, addressBytes, (short) 1,
 				addrLength) == 0;
 	}
-	
+
 	/**
 	 * Returns the size of this BitcoinAddress in bytes.
 	 */

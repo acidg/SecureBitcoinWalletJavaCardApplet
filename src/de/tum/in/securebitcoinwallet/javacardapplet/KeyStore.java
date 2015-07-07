@@ -1,8 +1,14 @@
 package de.tum.in.securebitcoinwallet.javacardapplet;
 
+import javacard.framework.CardRuntimeException;
+import javacard.framework.JCSystem;
+import javacard.framework.Util;
 import javacard.security.AESKey;
 import javacard.security.ECPrivateKey;
+import javacard.security.ECPublicKey;
 import javacard.security.KeyBuilder;
+import javacard.security.KeyPair;
+import javacard.security.MessageDigest;
 import javacard.security.RandomData;
 import javacardx.crypto.Cipher;
 
@@ -35,7 +41,7 @@ public class KeyStore {
 	 * can be used for a new key. This should be kept in sync with
 	 * {@link #addressToKeyIndexMap}.
 	 */
-	private ECPrivateKey[] keys;
+	private EncryptedPrivateKey[] keys;
 
 	/**
 	 * Map to find the key for a specified address. Maps addresses to the index
@@ -60,9 +66,34 @@ public class KeyStore {
 	private short addressIndex;
 
 	/**
-	 * Buffer used to encrypt private keys.
+	 * Used to generate a new keypair and sign transactions.
+	 */
+	private KeyPair keyPair;
+
+	/**
+	 * Digest used for hashing with SHA256.
+	 */
+	private MessageDigest sha256Digest;
+
+	/**
+	 * Digest used for hashing with RIPEMD160.
+	 */
+	private MessageDigest ripemd160Digest;
+
+	/**
+	 * Buffer used to encrypt private keys and temporary store key data.
+	 */
+	private byte[] keyBuffer;
+	
+	/**
+	 * Buffer used in {@link #encryptPrivateKey(ECPrivateKey, byte[], short)}.
 	 */
 	private byte[] encryptionBuffer;
+
+	/**
+	 * Buffer for base58 encoding.
+	 */
+	private byte[] base58Buffer;
 
 	/**
 	 * Constructor. Has to be called inside the constructor of the applet to
@@ -86,21 +117,31 @@ public class KeyStore {
 			addressSize = 0xFE;
 		}
 
+		keyBuffer = new byte[256];
 		encryptionBuffer = new byte[PRIVATE_KEY_LENGTH / 8];
+		base58Buffer = new byte[256];
 
-		byte[] randomData = new byte[AES_KEY_LENGTH / 8];
 		RandomData.getInstance(RandomData.ALG_SECURE_RANDOM).generateData(
-				randomData, (short) 0, (byte) randomData.length);
+				keyBuffer, (short) 0, (short) (AES_KEY_LENGTH / 8));
 
 		aesKey = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES,
 				AES_KEY_LENGTH, false);
-		aesKey.setKey(randomData, (short) 0);
+		aesKey.setKey(keyBuffer, (short) 0);
 
 		aesCipher = Cipher.getInstance(AES_ENCRYPTION_MODE, false);
 
-		keys = new ECPrivateKey[storeSize];
+		keyPair = new KeyPair(KeyPair.ALG_EC_FP, KeyBuilder.LENGTH_EC_FP_256);
+
+		keys = new EncryptedPrivateKey[storeSize];
+
+		sha256Digest = MessageDigest.getInstance(MessageDigest.ALG_SHA_256,
+				false);
+
+		ripemd160Digest = MessageDigest.getInstance(
+				MessageDigest.ALG_RIPEMD160, false);
 
 		addressToKeyIndexMap = new BitcoinAddress[storeSize];
+
 		// Allocate memory for addresses
 		for (short i = 0; i < addressToKeyIndexMap.length; i++) {
 			addressToKeyIndexMap[i] = new BitcoinAddress(addressSize);
@@ -108,11 +149,66 @@ public class KeyStore {
 
 		// Allocate memory for keys
 		for (short i = 0; i < keys.length; i++) {
-			keys[i] = (ECPrivateKey) KeyBuilder.buildKey(
-					KeyBuilder.TYPE_EC_FP_PRIVATE, PRIVATE_KEY_LENGTH,
-					false);
-
+			keys[i] = new EncryptedPrivateKey(PRIVATE_KEY_LENGTH);
 		}
+	}
+
+	/**
+	 * Generates a new key pair and returns the public key if the stroe has
+	 * space left. Stores the private key in this {@link KeyStore}.
+	 * 
+	 * @param dest The output buffer where the new public key will bew
+	 *            written.
+	 * @param destOff The offset inside the output buffer.
+	 * 
+	 * @return The length of the new public key in bytes or 0 if the store is
+	 *         full.
+	 */
+	public short generateKeyPair(byte[] dest, short destOff) {
+		findFirstFreePosition();
+
+		if (addressIndex == 0xFF) {
+			return 0;
+		}
+
+		// Set EC params TODO: Move to constructor?
+		ECPrivateKey privKey = (ECPrivateKey) keyPair.getPrivate();
+
+		privKey.setFieldFP(SECP256K1.P, (short) 0, (short) SECP256K1.P.length);
+		privKey.setA(SECP256K1.a, (short) 0, (short) SECP256K1.a.length);
+		privKey.setB(SECP256K1.b, (short) 0, (short) SECP256K1.b.length);
+		privKey.setG(SECP256K1.G, (short) 0, (short) SECP256K1.G.length);
+		privKey.setR(SECP256K1.R, (short) 0, (short) SECP256K1.R.length);
+		privKey.setK(SECP256K1.K);
+
+		ECPublicKey pubKey = (ECPublicKey) keyPair.getPublic();
+
+		pubKey.setFieldFP(SECP256K1.P, (short) 0, (short) SECP256K1.P.length);
+		pubKey.setA(SECP256K1.a, (short) 0, (short) SECP256K1.a.length);
+		pubKey.setB(SECP256K1.b, (short) 0, (short) SECP256K1.b.length);
+		pubKey.setG(SECP256K1.G, (short) 0, (short) SECP256K1.G.length);
+		pubKey.setR(SECP256K1.R, (short) 0, (short) SECP256K1.R.length);
+		pubKey.setK(SECP256K1.K);
+
+		// Generate the keys
+		keyPair.genKeyPair();
+
+		// Calculate the key's Bitcoin address, the address is stored in
+		// keyBuffer
+		short addressLength = calculateBitcoinAddress(pubKey);
+
+		// Store address in the addressToKeyIndexMap
+		addressToKeyIndexMap[addressIndex].setAddress(keyBuffer, (short) 0,
+				addressLength);
+		
+		// Encrypt private key
+		short keyLength = encryptPrivateKey(privKey, keyBuffer, (short) 0);
+		
+		// Store private key in this KeyStore
+		keys[addressIndex].setKey(keyBuffer, (short) 0, keyLength);
+
+		// Return the public key
+		return pubKey.getW(dest, destOff);
 	}
 
 	/**
@@ -124,61 +220,45 @@ public class KeyStore {
 	 * @param addrLength Length of the address
 	 * @param keyOff Offset of the private key inside the byte array
 	 * @param keyLength Length of the private key
-	 * 
-	 * @return True, if the key could be saved, false if the store is full, the
-	 *         address is too long or the address is already in the key store.
 	 */
-	public boolean putPrivateKey(byte[] src, short addrOff, byte addrLength,
+	public void putPrivateKey(byte[] src, short addrOff, byte addrLength,
 			short keyOff, byte keyLength) {
 		findFirstFreePosition();
-		if (addressIndex == 0xFF
-				|| addrLength > addressToKeyIndexMap[0].getSize()) {
-			return false;
+		if (addressIndex == 0xFF) {
+			CardRuntimeException.throwIt(StatusCodes.KEYSTORE_FULL);
+		}
+		if (addrLength > addressToKeyIndexMap[0].getSize()) {
+			CardRuntimeException.throwIt(StatusCodes.WRONG_ADDRESS_LENGTH);
 		}
 
-		// Init key with parameters
-		keys[addressIndex].setFieldFP(SECP256K1.P, (short) 0,
-				(short) SECP256K1.P.length);
-		keys[addressIndex].setA(SECP256K1.a, (short) 0,
-				(short) SECP256K1.a.length);
-		keys[addressIndex].setB(SECP256K1.b, (short) 0,
-				(short) SECP256K1.b.length);
-		keys[addressIndex].setG(SECP256K1.G, (short) 0,
-				(short) SECP256K1.G.length);
-		keys[addressIndex].setR(SECP256K1.R, (short) 0,
-				(short) SECP256K1.R.length);
-		keys[addressIndex].setK(SECP256K1.K);
-		keys[addressIndex].setS(src, keyOff, keyLength);
-
-		// Add length of address to mapping array
 		addressToKeyIndexMap[addressIndex].setAddress(src, addrOff, addrLength);
-		return true;
+
+		aesCipher.init(aesKey, AES_ENCRYPTION_MODE);
 	}
 
 	/**
-	 * Retireves the encrypted private key for the given Bitcoin address.
+	 * Retrieves the encrypted private key for the given Bitcoin address.
 	 * 
 	 * @param src The byte array, in which the address and private key can be
 	 *            found.
 	 * @param addrOff Offset for the address inside the byte array
 	 * @param addrLength Length of the address
-	 * @param output The output buffer in which the encrypted key will be
+	 * @param dest The output buffer in which the encrypted key will be
 	 *            written.
-	 * @param outOff The offset inside the output buffer
+	 * @param destOff The offset inside the output buffer
 	 * 
 	 * @return The size of the encrypted key in bytes
 	 */
 	public short getEncryptedPrivateKey(byte[] src, short addrOff,
-			byte addrLength, byte[] output, short outOff) {
-		ECPrivateKey privateKey = getPrivateKey(src, addrOff, addrLength);
+			short addrLength, byte[] dest, short destOff) {
 
-		privateKey.getS(encryptionBuffer, (short) 0);
+		calculateIndexForAddress(src, addrOff, addrLength);
 
-		aesCipher.init(aesKey, Cipher.MODE_ENCRYPT);
-		aesCipher.doFinal(encryptionBuffer, (short) 0,
-				(short) encryptionBuffer.length, output, outOff);
+		if (addressIndex == 0xFF) {
+			CardRuntimeException.throwIt(StatusCodes.KEY_NOT_FOUND);
+		}
 
-		return (short) encryptionBuffer.length;
+		return keys[addressIndex].getKey(dest, destOff);
 	}
 
 	/**
@@ -194,7 +274,7 @@ public class KeyStore {
 		calculateIndexForAddress(src, addrOff, addrLength);
 		if (addressIndex != 0xFF) {
 			addressToKeyIndexMap[addressIndex].delete();
-			keys[addressIndex].clearKey();
+			keys[addressIndex].clear();
 		}
 	}
 
@@ -224,7 +304,7 @@ public class KeyStore {
 	 */
 	private void findFirstFreePosition() {
 		for (addressIndex = 0; addressIndex < keys.length; addressIndex++) {
-			if (!keys[addressIndex].isInitialized()) {
+			if (!keys[addressIndex].isInUse()) {
 				return;
 			}
 		}
@@ -232,23 +312,70 @@ public class KeyStore {
 	}
 
 	/**
-	 * Returns the private key for the given address key, or null, if the key
-	 * could not be found.
+	 * Encrypts the given private key with the AES key of this store.</br>
+	 * Uses {@link #encryptionBuffer}
 	 * 
-	 * @param src The byte array in which the address can be found
-	 * @param addrOff Offset of the address inside the given byte array
-	 * @param addrLength Length of the address
-	 * @param
-	 * @param dest
-	 * @return
+	 * @param privateKey The private key to encrypt
+	 * @param dest The destination, where the encrypted key is put
+	 * @param destOff Th offset inside the destination array
+	 * @return The legth of the encrypted key.
 	 */
-	private ECPrivateKey getPrivateKey(byte[] src, short addrOff,
-			short addrLength) {
-		calculateIndexForAddress(src, addrOff, addrLength);
-		if (addressIndex == 0xFF) {
-			return null;
-		}
+	private short encryptPrivateKey(ECPrivateKey privateKey, byte[] dest,
+			short destOff) {
+		short keyLength = privateKey.getS(encryptionBuffer, (short) 0);
 
-		return keys[addressIndex];
+		aesCipher.init(aesKey, Cipher.MODE_ENCRYPT);
+		aesCipher.doFinal(encryptionBuffer, (short) 0, keyLength, dest, destOff);
+
+		return destOff;
+	}
+
+	/**
+	 * Calculates the Bitcoin address from the given public key. The address
+	 * will be stored in the {@link #keyBuffer}.
+	 * </br>
+	 * Uses {@link #base58Buffer}.
+	 * </br>
+	 * See <a href=
+	 * "https://en.bitcoin.it/wiki/Technical_background_of_version_1_Bitcoin_addresses#How_to_create_Bitcoin_Address"
+	 * >How to create Bitcoin Address</a>
+	 * 
+	 * @param src The byte array in which the public key can be found
+	 * @param keyOff Offset of the key inside the given byte array
+	 * @param keyLength Length of the public key
+	 * 
+	 * @return The length of the calculated bitcoin address inside the
+	 *         {@link #keyBuffer}
+	 */
+	private short calculateBitcoinAddress(ECPublicKey pubKey) {
+
+		// Get key bytes
+		short keyLength = pubKey.getW(keyBuffer, (short) 0);
+
+		// Calculate sha256 hash of public key
+		short sha256Length = sha256Digest.doFinal(keyBuffer, (short) 0,
+				keyLength, keyBuffer, (short) 0);
+
+		// Calculate ripemd160 hash of sha256 hash
+		short ripemd160Length = ripemd160Digest.doFinal(keyBuffer, (short) 0,
+				sha256Length, keyBuffer, (short) 1);
+
+		// Add version byte (0x00 for Main Network)
+		keyBuffer[0] = (byte) 0x00;
+
+		// Calculate sha256 hash of extended RIPEMD-160 result
+		sha256Length = sha256Digest.doFinal(keyBuffer, (short) 0,
+				(short) (ripemd160Length + 1), keyBuffer,
+				(short) (ripemd160Length + 1));
+
+		// Calculate sha256 hash on the result of the previous SHA-256 hash
+		sha256Length = sha256Digest.doFinal(keyBuffer,
+				(short) (ripemd160Length + 1), sha256Length, keyBuffer,
+				(short) (ripemd160Length + 1));
+
+		// Calculate the base58 encoded address and return its length
+		return Base58.encode(keyBuffer, (short) 0,
+				(short) (ripemd160Length + 5), keyBuffer, (short) 0,
+				base58Buffer, (short) 0);
 	}
 }
