@@ -1,12 +1,10 @@
 # JavaCardApplet for the Secure Bitcoin Wallet
 
-This project is the JavaCard applet for the Secure Bitcoin Wallet app.
+This project is the JavaCard applet for the [Secure Bitcoin Wallet App](https://github.com/sockeqwe/SecureBitcoinWallet).
 
 ## Requirements
-We use Eclipse and the [EclipseJCDE](http://sourceforge.net/projects/eclipse-jcde/)
-plugin. To install it, you have to extract all .jar files of the plugin folder
-inside the zip file into the plugin directory of your eclipse installation root.
+We use Eclipse and [ant-javacard](https://github.com/martinpaljak/ant-javacard).
 
-The JavaCard SDK 2.2.2 (JCDK) is needed, too. You can get it [here](http://www.oracle.com/technetwork/java/javasebusiness/downloads/java-archive-downloads-javame-419430.html#java_card_kit-2.2.2-oth-JPR). The EclipseJCDE has to be configured to find the JCDK package. The file you need is called _java_card_kit-2_2_2-rr-bin-linux-do.zip_ and can be found in a folder called _java_card_kit-2_2_2_ inside the zip file from Oracle. Extract its content to a suitable location, where you want the JCDK to be installed. After that, select the location in the configuration tool for the EclipseJCDE (Eclipse menu: Java Card -> Preferences -> Java Card Home).
+The JavaCard SDK 3.0.5 (JCDK) is needed, too. You can get it [here](http://www.oracle.com/technetwork/java/embedded/javacard/downloads/javacard-sdk-2043229.html). _ant-javacard_ has to be configured via the build.xml to find the JCDK.
 
-For testing and simulation of the JavaCard, [jCardSim](https://github.com/licel/jcardsim) is used. This project is a JavaCard simulator, which also includes an implementation of the Oracle JavaCard Development Kit 2.2.2. and its sources. The library can be found in the [lib folder](lib).
+For testing, [jCardSim](https://github.com/licel/jcardsim) is used. This project is a JavaCard simulator, which also includes an implementation of the Oracle JavaCard Development Kit 3.0.4. The library can be found in the [lib folder](lib). The javadoc can be found at the [GitHub page](https://github.com/licel/jcardsim) of jcardsim. Just clone the repository and link Eclipse to its doc and/or source folders.
