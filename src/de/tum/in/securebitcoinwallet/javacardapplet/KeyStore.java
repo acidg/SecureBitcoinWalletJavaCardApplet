@@ -1,9 +1,7 @@
 package de.tum.in.securebitcoinwallet.javacardapplet;
 
-import com.licel.jcardsim.crypto.ECPrivateKeyImpl;
-
 import javacard.framework.CardRuntimeException;
-import javacard.framework.Util;
+import javacard.framework.ISO7816;
 import javacard.security.AESKey;
 import javacard.security.ECPrivateKey;
 import javacard.security.ECPublicKey;
@@ -57,6 +55,11 @@ public class KeyStore {
 	private BitcoinAddress[] addressToKeyIndexMap;
 
 	/**
+	 * Index of the key with has been selected for signing data.
+	 */
+	private short selectedAddress;
+
+	/**
 	 * Key used for encryption of the private keys. Generated randomly during
 	 * instantiation of this KeyStore.
 	 */
@@ -77,6 +80,11 @@ public class KeyStore {
 	 */
 	private KeyPair keyPair;
 
+	/**
+	 * Signature used to sign messages.
+	 */
+	private Signature signature;
+	
 	/**
 	 * Digest used for hashing with SHA256.
 	 */
@@ -180,29 +188,77 @@ public class KeyStore {
 	}
 
 	/**
-	 * Signs the given message with the key of the given Bitcoin address. Input
-	 * and output buffer may overlap.
+	 * Selects the key specified by the given Bitcoin address for signing data.
 	 * 
-	 * @param src The buffer, in which the address and message can be found
+	 * @param src The buffer, in which the addresscan be found
 	 * @param addrOff The offset of the Bitcoin address inside the buffer
 	 * @param addrLength The length of the Bitcoin address inside the buffer
-	 * @param msgOff The offset of the message inside the buffer
-	 * @param msgLength The length of the message inside the buffer
+	 */
+	public void selectKeyForSignature(byte[] src, short addrOff,
+			short addrLength) {
+
+		calculateIndexForAddress(src, addrOff, addrLength);
+
+		selectedAddress = addressIndex;
+		
+		if (addressIndex == 0xFF) {
+			CardRuntimeException.throwIt(StatusCodes.KEY_NOT_FOUND);
+		}
+	}
+
+	/**
+	 * Initializes the signature process.
+	 * 
+	 * @param src The buffer, in which the data to sign can be found.
+	 * @param msgOffset The offset if the data inside the buffer
+	 * @param msgLength The length of the data to sign
+	 */
+	public void signMessageInit(byte[] src, short msgOffset, short msgLength) {
+		signature = Signature.getInstance(Signature.ALG_HMAC_SHA_256, false);
+		signature.init(keyPair.getPrivate(), Signature.ALG_HMAC_SHA_256);
+	}
+	
+	/**
+	 * Updates the signature with additional data.
+	 * 
+	 * @param src The buffer, in which the data to sign can be found.
+	 * @param msgOffset The offset if the data inside the buffer
+	 * @param msgLength The length of the data to sign
+	 */
+	public void signMessageUpdate(byte[] src, short msgOffset, short msgLength) {
+		
+	}
+	
+	/**
+	 * Finalizes the signature with the last chunk data.
+	 * 
+	 * @param src The buffer, in which the data to sign can be found.
+	 * @param msgOffset The offset if the data inside the buffer
+	 * @param msgLength The length of the data to sign
+	 */
+	public short signMessageFinal(byte[] src, short msgOffset, short msgLength, byte[] dest, short destOff) {
+		return 0;
+	}
+
+	/**
+	 * Signs the given sha256Hash with the key of the previously selected private key. Input
+	 * and output buffer may overlap.
+	 * 
+	 * @param src The buffer, in which the sha256Hash can be found
+	 * @param msgOff The offset of the sha256Hash inside the buffer
+	 * @param msgLength The length of the sha256Hash inside the buffer
 	 * @param dest The buffer in which the signed message will be written
 	 * @param destOff The offset inside the output buffer
 	 * 
 	 * @return Length of the signed message inside the output buffer
 	 */
-	public short signMessage(byte[] src, short addrOff, short addrLength,
-			short msgOff, short msgLength, byte[] dest, short destOff) {
+	public short signMessage(byte[] src, short msgOff, short msgLength, byte[] dest, short destOff) {
 
-		calculateIndexForAddress(src, addrOff, addrLength);
-
-		if (addressIndex == (short) 0xff) {
-			CardRuntimeException.throwIt(StatusCodes.KEYSTORE_FULL);
+		if (selectedAddress == (short) 0xFF) {
+			CardRuntimeException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
 		}
 
-		short keyLength = decryptPrivateKey(keys[addressIndex], keyBuffer,
+		short keyLength = decryptPrivateKey(keys[selectedAddress], keyBuffer,
 				(short) 0);
 
 		ECPrivateKey privateKey = (ECPrivateKey) keyPair.getPrivate();
@@ -315,7 +371,7 @@ public class KeyStore {
 	 * @param addrOff Offset for the address inside the byte array
 	 * @param addrLength Length of the address
 	 */
-	public void removePrivateKey(byte[] src, short addrOff, short addrLength) {
+	public void deletePrivateKey(byte[] src, short addrOff, short addrLength) {
 		calculateIndexForAddress(src, addrOff, addrLength);
 		if (addressIndex != 0xFF) {
 			addressToKeyIndexMap[addressIndex].delete();
@@ -364,6 +420,11 @@ public class KeyStore {
 	 */
 	private void calculateIndexForAddress(byte[] src, short addrOff,
 			short addrLength) {
+		
+		if ((addrLength & 0xFF) > 0xFF) {
+			CardRuntimeException.throwIt(StatusCodes.WRONG_ADDRESS_LENGTH);
+		}
+		
 		for (addressIndex = 0; addressIndex < addressToKeyIndexMap.length; addressIndex++) {
 			if (addressToKeyIndexMap[addressIndex].equalsAddress(src, addrOff,
 					addrLength)) {

@@ -6,6 +6,7 @@ import javacard.framework.ISO7816;
 import javacard.framework.ISOException;
 import javacard.framework.JCSystem;
 import javacard.framework.OwnerPIN;
+import javacard.framework.Util;
 import javacard.security.RandomData;
 
 /**
@@ -61,6 +62,21 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	public final static byte ADDRESS_SIZE = (byte) 0x24;
 
 	/**
+	 * Sign mode initialize.
+	 */
+	public final static byte SIGN_MODE_INIT = (byte) 0x01;
+
+	/**
+	 * Sign mode update.
+	 */
+	public final static byte SIGN_MODE_UPDATE = (byte) 0x02;
+
+	/**
+	 * Sign mode finalize.
+	 */
+	public final static byte SIGN_MODE_FINAL = (byte) 0x03;
+
+	/**
 	 * For the setup function which should only be called once.
 	 */
 	private boolean setupDone = false;
@@ -81,6 +97,8 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 */
 	private KeyStore keyStore;
 
+	private byte[] sha256TransactionHash;
+
 	/**
 	 * Constructor. Should initialize needed memory to prevent out of memory
 	 * during runtime. Only this class's install method should create the applet
@@ -93,6 +111,8 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 		pin.update(DEFAULT_PIN, (byte) 0, (byte) DEFAULT_PIN.length);
 
 		keyStore = new KeyStore(STORE_SIZE, ADDRESS_SIZE);
+
+		sha256TransactionHash = new byte[32];
 
 		register();
 	}
@@ -150,11 +170,16 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 		case AppletInstructions.INS_PIN_VALIDATED:
 			isPinValidated(apdu, buffer);
 			break;
+		case AppletInstructions.INS_SELECT_KEY:
+			selectKey(apdu, buffer);
+			break;
 		case AppletInstructions.INS_SIGN_TRANSACTION:
 			signTransaction(apdu, buffer);
 			break;
-		case AppletInstructions.INS_PUT_PRIVATE_KEY:
-			putPrivateKey(apdu, buffer);
+		case AppletInstructions.INS_SIGN_SHA256_HASH:
+			signSHA256Hash(apdu, buffer);
+		case AppletInstructions.INS_IMPORT_PRIVATE_KEY:
+			importPrivateKey(apdu, buffer);
 			break;
 		case AppletInstructions.INS_GET_PRIVATE_KEY:
 			getPrivateKey(apdu, buffer);
@@ -173,9 +198,11 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	/**
 	 * Setup of the card. Generates and returns the PUK to reset the PIN.
 	 * 
+	 * <pre>
 	 * INS: 0x02
 	 * P1: 0x00
 	 * P2: 0x00
+	 * </pre>
 	 * 
 	 * Return: The generated PUK
 	 */
@@ -196,17 +223,23 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	/**
 	 * Unlocks the card, if the PIN has been entered wrong too many times.
 	 * 
-	 * INS: 0x04
-	 * P1: PUK length
-	 * P2: new PIN length
-	 * Lc: total length in bytes (P1 + P2)
-	 * Data: PUK and new PIN
+	 * <pre>
+	 * INS:	0x04
+	 * P1:	PUK length
+	 * P2:	new PIN length
+	 * Lc:	total length in bytes (P1 + P2)
+	 * Data:	PUK and new PIN
+	 * </pre>
 	 */
 	private void unlock(APDU apdu, byte[] buffer) {
 		if (buffer[ISO7816.OFFSET_P1] != PUK_SIZE
 				|| buffer[ISO7816.OFFSET_P2] < PIN_MINIMUM_SIZE
 				|| buffer[ISO7816.OFFSET_P2] > PIN_MAXIMUM_SIZE) {
 			ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
+		}
+
+		if (apdu.setIncomingAndReceive() == 0) {
+			ISOException.throwIt(ISO7816.SW_DATA_INVALID);
 		}
 
 		if (!puk.check(buffer, ISO7816.OFFSET_CDATA, buffer[ISO7816.OFFSET_P1])) {
@@ -222,11 +255,13 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	/**
 	 * Authenticates the user via the pin.
 	 * 
-	 * INS: 0x04
-	 * P1: 0x00
-	 * P2: 0x00
-	 * Lc: PIN length in bytes
-	 * Data: PIN itself
+	 * <pre>
+	 * INS:	0x04
+	 * P1:	0x00
+	 * P2:	0x00
+	 * Lc:	PIN length in bytes
+	 * Data:	PIN itself
+	 * </p>
 	 */
 	private void authenticate(APDU apdu, byte[] buffer) {
 		pin.reset();
@@ -252,23 +287,27 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	/**
 	 * Changes the PIN. The User has to be authenticated.
 	 * 
-	 * INS: 0x06
-	 * P1: 0x00
-	 * P2: 0x00
-	 * Lc: length of
-	 * PIN Data: PIN itself
+	 * <pre>
+	 * INS:	0x06
+	 * P1: 	0x00
+	 * P2: 	0x00 
+	 * Lc: 	length of PIN
+	 * Data:	PIN itself
+	 * </pre>
 	 */
 	private void changePin(APDU apdu, byte[] buffer) {
 		if (!pin.isValidated()) {
 			ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
 		}
 
-		apdu.setIncomingAndReceive();
-
 		byte pin_size = buffer[ISO7816.OFFSET_LC];
 
 		if (pin_size < PIN_MINIMUM_SIZE || pin_size > PIN_MAXIMUM_SIZE) {
 			ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+		}
+
+		if (apdu.setIncomingAndReceive() == 0) {
+			ISOException.throwIt(ISO7816.SW_DATA_INVALID);
 		}
 
 		pin.update(buffer, (short) (ISO7816.OFFSET_CDATA), pin_size);
@@ -278,9 +317,14 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	/**
 	 * Checks whether the PIN is validated.
 	 * 
-	 * INS: 0x08
-	 * P1: 0x00
-	 * P2: 0x00
+	 * <pre>
+	 * INS:	0x08
+	 * P1:	0x00 
+	 * P2:	0x00
+	 * Lc:	0x00
+	 * 
+	 * Return: 0x01 if the PIN is validated, 0x00 otherwise.
+	 * </pre>
 	 */
 	private void isPinValidated(APDU apdu, byte[] buffer) {
 		buffer[0] = pin.isValidated() ? (byte) 1 : (byte) 0;
@@ -289,37 +333,138 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	}
 
 	/**
-	 * Signs the given transaction with the corresponding private key of the
-	 * specified bitcoin address.
+	 * Selects the key specified by the given address. Used to sign a
+	 * transaction.
 	 * 
-	 * INS: 0xAB
-	 * P1: length of address in bytes
-	 * P2: length of transaction data in bytes
-	 * Lc: total length Data: address and private key
+	 * <pre>
+	 * INS:	0xAA 
+	 * P1:	0x00 
+	 * P2:	0x00 
+	 * Lc:	length of address in bytes
+	 * Data:	bitcoin address
+	 * </pre>
+	 */
+	private void selectKey(APDU apdu, byte[] buffer) {
+		if (!pin.isValidated()) {
+			ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+		}
+
+		if (apdu.setIncomingAndReceive() == 0) {
+			ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+		}
+
+		keyStore.selectKeyForSignature(buffer, ISO7816.OFFSET_CDATA,
+				buffer[ISO7816.OFFSET_LC]);
+	}
+
+	/**
+	 * Signs the given transaction with the corresponding private key of the
+	 * previously selected key, see: {@link #selectKey()}.
+	 * 
+	 * <pre>
+	 * INS:	0xAB
+	 * P1:	Mode: INIT 0x01, UPDATE 0x02, FINAL 0x03
+	 * P2:	0x00
+	 * Lc:	Length of data
+	 * Data: Data to sign
+	 * 
+	 * Return: The signature, if P1 is set to final.
+	 * </pre>
 	 */
 	private void signTransaction(APDU apdu, byte[] buffer) {
-		// TODO Auto-generated method stub
+		if (!pin.isValidated()) {
+			ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+		}
 
+		if (apdu.setIncomingAndReceive() == 0) {
+			ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+		}
+
+		switch (buffer[ISO7816.OFFSET_P1]) {
+		case SIGN_MODE_INIT:
+			keyStore.signMessageInit(buffer, ISO7816.OFFSET_CDATA,
+					buffer[ISO7816.OFFSET_LC]);
+			break;
+		case SIGN_MODE_UPDATE:
+			keyStore.signMessageUpdate(buffer, ISO7816.OFFSET_CDATA,
+					buffer[ISO7816.OFFSET_LC]);
+			break;
+		case SIGN_MODE_FINAL:
+			apdu.setOutgoingAndSend((short) 0, keyStore.signMessageFinal(
+					buffer, ISO7816.OFFSET_CDATA, buffer[ISO7816.OFFSET_LC],
+					buffer, (short) 0));
+			break;
+		default:
+			ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
+		}
+	}
+
+	/**
+	 * Sign the given SHA256Hash of a Bitcoin transcation with the corresponding
+	 * private key of the previously selected key, see: {@link #selectKey()}.
+	 * 
+	 * <pre>
+	 * INS:	0xAC
+	 * P1:	0x00
+	 * P2:	0x00
+	 * Lc:	0xFF
+	 * Data: SHA256 hash of the Bitcoin transcation
+	 * 
+	 * Return: The signature of the given hash.
+	 * </pre>
+	 */
+	private void signSHA256Hash(APDU apdu, byte[] buffer) {
+		if (!pin.isValidated()) {
+			ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+		}
+
+		if (buffer[ISO7816.OFFSET_P1] != 0x00
+				|| buffer[ISO7816.OFFSET_P2] != 0x00) {
+			ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
+		}
+
+		if (buffer[ISO7816.OFFSET_LC] != 0xFF) {
+			ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+		}
+
+		if (apdu.setIncomingAndReceive() != (short) sha256TransactionHash.length) {
+			ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+		}
+
+		Util.arrayCopy(buffer, ISO7816.OFFSET_CDATA, sha256TransactionHash,
+				(short) 0, buffer[ISO7816.OFFSET_LC]);
+
+		apdu.setOutgoingAndSend((short) 0, keyStore.signMessage(buffer,
+				ISO7816.OFFSET_CDATA, buffer[ISO7816.OFFSET_LC], buffer,
+				(short) 0));
 	}
 
 	/**
 	 * Stores the given private key encrypted in the EEPROM.
 	 * 
-	 * INS: 0xD8
-	 * P1: length of address in bytes
-	 * P2: length of private key in bytes
-	 * Lc: total length Data: address and private key
+	 * <pre>
+	 * INS:	0xD8
+	 * P1:	length of address in bytes
+	 * P2:	length of private key in bytes
+	 * Lc:	total length Data: address and private key
+	 * Data:	[address + privateKey]
 	 * 
 	 * Return: The address for which the key is stored, if the operation was
 	 * successful.
+	 * </pre>
+	 * 
 	 */
-	private void putPrivateKey(APDU apdu, byte[] buffer) {
+	private void importPrivateKey(APDU apdu, byte[] buffer) {
 		if (!pin.isValidated()) {
 			ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
 		}
 
 		if (((short) (buffer[ISO7816.OFFSET_P1] & 0xFF)) > ((short) ADDRESS_SIZE & 0xFF)) {
 			ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
+		}
+
+		if (apdu.setIncomingAndReceive() == 0) {
+			ISOException.throwIt(ISO7816.SW_DATA_INVALID);
 		}
 
 		keyStore.importPrivateKey(buffer, ISO7816.OFFSET_CDATA,
@@ -331,18 +476,24 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	/**
 	 * Gets the encrypted private key.
 	 * 
-	 * INS: 0xB0
-	 * P1: 0x00
-	 * P2: 0x00
-	 * Lc: Length of address
-	 * Data: Address for which the encrypted key should be fetched.
+	 * <pre>
+	 * INS:	0xB0
+	 * P1:	0x00
+	 * P2:	0x00
+	 * Lc:	Length of Bitcoin address
+	 * Data:	Bitcoin address for which the encrypted key should be fetched.
+	 * 
+	 * Return: The encrypted private key for the given address
+	 * </pre>
 	 */
 	private void getPrivateKey(APDU apdu, byte[] buffer) {
 		if (!pin.isValidated()) {
 			ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
 		}
 
-		apdu.setIncomingAndReceive();
+		if (apdu.setIncomingAndReceive() == 0) {
+			ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+		}
 
 		if (((short) buffer[ISO7816.OFFSET_LC] & 0xFF) > ((short) ADDRESS_SIZE & 0xFF)) {
 			ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
@@ -356,35 +507,44 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	/**
 	 * Deletes the private key for the given address.
 	 * 
-	 * INS: 0xE4
-	 * P1: 0x00
-	 * P2: 0x00
-	 * Lc: Length of address
-	 * Data: Address for which the private key should be deleted.
+	 * <pre>
+	 * INS:	0xE4
+	 * P1:	0x00
+	 * P2:	0x00
+	 * Lc:	Length of address
+	 * Data:	Address for which the private key should be deleted.
+	 * </pre>
 	 */
 	private void deletePrivateKey(APDU apdu, byte[] buffer) {
 		if (!pin.isValidated()) {
 			ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
 		}
 
-		apdu.setIncomingAndReceive();
+		if (apdu.setIncomingAndReceive() == 0) {
+			ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+		}
 
 		if (((short) buffer[ISO7816.OFFSET_LC] & 0xFF) > ((short) ADDRESS_SIZE & 0xFF)) {
 			ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
 		}
-		// TODO implement
+
+		keyStore.deletePrivateKey(buffer, ISO7816.OFFSET_CDATA,
+				buffer[ISO7816.OFFSET_LC]);
 	}
 
 	/**
 	 * Returns the remaining memory in bytes.
 	 * 
-	 * INS: 0x28
-	 * P1: 0x00
-	 * P2: 0x00
-	 * Lc: 0x00
+	 * <pre>
+	 * INS:	0x28
+	 * P1:	0x00
+	 * P2:	0x00
+	 * Lc:	0x00
+	 * 
+	 * Return: The remaining memory in bytes.
+	 * </pre>
 	 */
 	private void getRemainingMemory(APDU apdu, byte[] buffer) {
-		apdu.setIncomingAndReceive();
 		short remainingMemory = JCSystem
 				.getAvailableMemory(JCSystem.MEMORY_TYPE_PERSISTENT);
 
@@ -392,21 +552,5 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 		buffer[1] = (byte) (remainingMemory & 0xFF);
 
 		apdu.setOutgoingAndSend((short) 0, (short) 2);
-	}
-
-	/**
-	 * Compares the given bytes for value. Used because bytes are always
-	 * unsigned in Java.
-	 * 
-	 * @param n1 The first byte
-	 * @param n2 The second byte
-	 * 
-	 * @return True, if the first byte is smaller than the second one, false
-	 *         otherwise.
-	 */
-	@Deprecated
-	// TODO needed?
-	public static boolean isStrictlyLessThanUnsigned(byte n1, byte n2) {
-		return (n1 < n2) ^ ((n1 < 0) != (n2 < 0));
 	}
 }
