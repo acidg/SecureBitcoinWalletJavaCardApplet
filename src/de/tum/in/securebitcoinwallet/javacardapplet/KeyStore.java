@@ -40,7 +40,7 @@ public class KeyStore {
 	 * {@link #addressToKeyIndexMap}.
 	 */
 	private EncryptedPrivateKey[] keys;
-	
+
 	/**
 	 * The current number of registered keys.
 	 */
@@ -87,7 +87,7 @@ public class KeyStore {
 	 * Buffer used to encrypt private keys and temporary store key data.
 	 */
 	private byte[] keyBuffer;
-	
+
 	/**
 	 * Buffer used in {@link #encryptPrivateKey(ECPrivateKey, byte[], short)}.
 	 */
@@ -157,6 +157,25 @@ public class KeyStore {
 	}
 
 	/**
+	 * Signs the given message with the key of the given Bitcoin address.
+	 * 
+	 * @param src The buffer, in which the address and message can be found
+	 * @param addrOff The offset of the Bitcoin address inside the buffer
+	 * @param addrLength The length of the Bitcoin address inside the buffer
+	 * @param msgOff The offset of the message inside the buffer
+	 * @param msgLength The length of the message inside the buffer
+	 * @param dest The buffer in which the signed message will be written
+	 * @param destOff The offset inside the output buffer
+	 * 
+	 * @return Length of the signed message inside the output buffer
+	 */
+	public short signMessage(byte[] src, short addrOff, short addrLength,
+			short msgOff, short msgLength, byte[] dest, short destOff) {
+		// TODO implement
+		return 0;
+	}
+
+	/**
 	 * Generates a new key pair and returns the public key if the stroe has
 	 * space left. Stores the private key in this {@link KeyStore}.
 	 * 
@@ -202,10 +221,10 @@ public class KeyStore {
 		// Store address in the addressToKeyIndexMap
 		addressToKeyIndexMap[addressIndex].setAddress(keyBuffer, (short) 0,
 				addressLength);
-		
+
 		// Encrypt private key
 		short keyLength = encryptPrivateKey(privKey, keyBuffer, (short) 0);
-		
+
 		// Store private key in this KeyStore
 		keys[addressIndex].setKey(keyBuffer, (short) 0, keyLength);
 
@@ -286,31 +305,31 @@ public class KeyStore {
 	 * @return The current amount of registered private keys in this KeyStore
 	 */
 	public short getNumberOfKeys() {
-		numberOfKeys = 0;
-		
-		for (EncryptedPrivateKey key : keys) {
-			if (key.inUse) {
-				numberOfKeys++;
+		numberOfKeys = (short) 0;
+
+		for (short i = 0; i < (short) keys.length; i++) {
+			if (keys[i].inUse) {
+				numberOfKeys = (short) (numberOfKeys + 1);
 			}
 		}
-		
+
 		return numberOfKeys;
 	}
-	
+
 	/**
 	 * Calculates the amount of free key slots.
 	 */
 	public short getNumberofKeysRemaining() {
 		return (short) (keys.length - getNumberOfKeys());
 	}
-	
+
 	/**
 	 * Whether this KeyStore is full.
 	 */
 	public boolean isFull() {
-		return getNumberOfKeys() == keys.length;
+		return getNumberOfKeys() == (short) keys.length;
 	}
-	
+
 	/**
 	 * Calculates the index of the key for the given address in
 	 * {@link #addressIndex}.
@@ -358,7 +377,8 @@ public class KeyStore {
 		short keyLength = privateKey.getS(encryptionBuffer, (short) 0);
 
 		aesCipher.init(aesKey, Cipher.MODE_ENCRYPT);
-		aesCipher.doFinal(encryptionBuffer, (short) 0, keyLength, dest, destOff);
+		aesCipher
+				.doFinal(encryptionBuffer, (short) 0, keyLength, dest, destOff);
 
 		return destOff;
 	}

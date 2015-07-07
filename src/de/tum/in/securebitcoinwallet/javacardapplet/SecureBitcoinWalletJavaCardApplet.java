@@ -322,7 +322,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 			ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
 		}
 
-		keyStore.putPrivateKey(buffer, ISO7816.OFFSET_CDATA,
+		keyStore.importPrivateKey(buffer, ISO7816.OFFSET_CDATA,
 				buffer[ISO7816.OFFSET_P1],
 				(short) (ISO7816.OFFSET_CDATA + buffer[ISO7816.OFFSET_P1]),
 				buffer[ISO7816.OFFSET_P2]);
