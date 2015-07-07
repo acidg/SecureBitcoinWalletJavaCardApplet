@@ -1,0 +1,26 @@
+<project name="SecureBitcoinWalletJavaCardApplet" default="build" basedir=".">
+  <description>
+    Creates the .cap file of this applet
+  </description>
+  
+  <taskdef name="javacard" classname="pro.javacard.ant.JavaCard" classpath="lib/ant-javacard.jar"/>
+
+  <target name="init">
+    <mkdir dir="./bin"/>
+    <mkdir dir="./bin/cap"/>
+  </target>
+
+  <target name="build" depends="init"
+        description="compile the source and build the .cap file">
+    <javacard>
+	  <cap jckit="/opt/oracle/jcdk3.0.5" aid="01020304050607080900" output="./bin/cap/javacard.cap" sources="./src/">
+	    <applet class="de.tum.in.securebitcoinwallet.javacardapplet.SecureBitcoinWalletJavaCardApplet" aid="0102030405060708090000"/>
+	  </cap>
+	</javacard>
+  </target>
+
+  <target name="clean"
+        description="clean up">
+    <delete dir="./bin"/>
+  </target>
+</project>
