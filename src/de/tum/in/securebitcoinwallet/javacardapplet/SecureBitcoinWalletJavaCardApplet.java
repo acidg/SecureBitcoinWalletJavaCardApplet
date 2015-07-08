@@ -408,7 +408,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * INS:	0xAC
 	 * P1:	0x00
 	 * P2:	0x00
-	 * Lc:	0xFF
+	 * Lc:	Length of hash, should be less than 64 bytes.
 	 * Data: SHA256 hash of the Bitcoin transcation
 	 * 
 	 * Return: The signature of the given hash.
@@ -424,7 +424,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 			ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
 		}
 
-		if (buffer[ISO7816.OFFSET_LC] != 0xFF) {
+		if ((buffer[ISO7816.OFFSET_LC] & 0xFF) >= 0x40) {
 			ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
 		}
 
