@@ -20,8 +20,8 @@ public class EncryptedPrivateKey {
 	 */
 	boolean inUse;
 
-	public EncryptedPrivateKey(short keySize) {
-		privateKey = new byte[keySize];
+	public EncryptedPrivateKey() {
+		privateKey = new byte[64];
 		inUse = false;
 	}
 
@@ -33,6 +33,7 @@ public class EncryptedPrivateKey {
 		if (srcLength != (short) privateKey.length) {
 			CardRuntimeException.throwIt(StatusCodes.WRONG_PRIVATE_KEY_LENGTH);
 		}
+		
 		Util.arrayCopy(src, srcOff, privateKey, (short) 0, srcLength);
 	}
 

@@ -11,8 +11,7 @@ public abstract class CryptTestBase extends AppletTestBase {
 
 	public CryptTestBase() {
 		super();
-		byte[] response = authenticate(SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN);
-		assertTrue(commandSuccessful(response));
+		assertTrue(commandSuccessful(authenticate(SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN)));
 		byte[] bitcoinAdress = BITCOIN_ADDRESS_STRING.getBytes();
 		byte[] privateKey = PRIVATE_KEY_STRING.getBytes();
 
@@ -38,7 +37,7 @@ public abstract class CryptTestBase extends AppletTestBase {
 			importKeyInstruction[i + offset] = privateKey[i];
 		}
 
-		response = simulator.transmitCommand(importKeyInstruction);
-		System.out.println(getHexString(response));
+		assertTrue(commandSuccessful(simulator
+				.transmitCommand(importKeyInstruction)));
 	}
 }

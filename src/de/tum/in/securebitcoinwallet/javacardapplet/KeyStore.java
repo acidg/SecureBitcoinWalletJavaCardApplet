@@ -2,6 +2,7 @@ package de.tum.in.securebitcoinwallet.javacardapplet;
 
 import javacard.framework.CardRuntimeException;
 import javacard.framework.ISO7816;
+import javacard.framework.Util;
 import javacard.security.AESKey;
 import javacard.security.ECPrivateKey;
 import javacard.security.ECPublicKey;
@@ -22,19 +23,24 @@ import javacardx.crypto.Cipher;
 public class KeyStore {
 
 	/**
+	 * The encryption to use for encrypting the private keys.
+	 */
+	private static final byte ENCRYPTION_KEY_TYPE = KeyBuilder.TYPE_AES;
+
+	/**
 	 * AES encryption used for encrypting the private key for export.
 	 */
-	private static final byte AES_ENCRYPTION_MODE = Cipher.ALG_AES_BLOCK_128_CBC_NOPAD;
+	private static final byte ENCRYPTION_MODE = Cipher.ALG_AES_BLOCK_128_CBC_NOPAD;
 
 	/**
 	 * Length of the AES key.
 	 */
-	private static final short AES_KEY_LENGTH = KeyBuilder.LENGTH_AES_128;
+	private static final short ENCRYPTION_KEY_LENGTH = KeyBuilder.LENGTH_AES_128;
 
 	/**
-	 * Length of the elliptic curve private key. Bitcoin uses 256 bits.
+	 * The maximum length of a private key in bytes.
 	 */
-	private static final short PRIVATE_KEY_LENGTH = KeyBuilder.LENGTH_EC_FP_256;
+	private static final short MAX_PRIVATE_KEY_SIZE = 63;
 
 	/**
 	 * The store for the private keys. If a key is null, the slot is free and
@@ -44,15 +50,15 @@ public class KeyStore {
 	private EncryptedPrivateKey[] keys;
 
 	/**
-	 * The current number of registered keys.
-	 */
-	private short numberOfKeys;
-
-	/**
 	 * Map to find the key for a specified address. Maps addresses to the index
 	 * of the corresponding private key inside the {@link keys} array.
 	 */
 	private BitcoinAddress[] addressToKeyIndexMap;
+
+	/**
+	 * The current number of registered keys.
+	 */
+	private short numberOfKeys;
 
 	/**
 	 * Index of the key with has been selected for signing data.
@@ -101,9 +107,10 @@ public class KeyStore {
 	private byte[] keyBuffer;
 
 	/**
-	 * Buffer used in {@link #encryptPrivateKey(ECPrivateKey, byte[], short)}.
+	 * Buffer used in {@link #encryptPrivateKey(ECPrivateKey, byte[], short)}
+	 * and {@link #decryptPrivateKey(EncryptedPrivateKey, byte[], short)}.
 	 */
-	private byte[] encryptionBuffer;
+	private byte[] encryptedBuffer;
 
 	/**
 	 * Buffer for base58 encoding.
@@ -133,17 +140,17 @@ public class KeyStore {
 		}
 
 		keyBuffer = new byte[256];
-		encryptionBuffer = new byte[PRIVATE_KEY_LENGTH / 8];
+		encryptedBuffer = new byte[64];
 		base58Buffer = new byte[256];
 
 		RandomData.getInstance(RandomData.ALG_SECURE_RANDOM).generateData(
-				keyBuffer, (short) 0, (short) (AES_KEY_LENGTH / 8));
+				keyBuffer, (short) 0, (short) (ENCRYPTION_KEY_LENGTH / 8));
 
-		aesKey = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES,
-				AES_KEY_LENGTH, false);
+		aesKey = (AESKey) KeyBuilder.buildKey(ENCRYPTION_KEY_TYPE,
+				ENCRYPTION_KEY_LENGTH, false);
 		aesKey.setKey(keyBuffer, (short) 0);
 
-		aesCipher = Cipher.getInstance(AES_ENCRYPTION_MODE, false);
+		aesCipher = Cipher.getInstance(ENCRYPTION_MODE, false);
 
 		keyPair = new KeyPair(KeyPair.ALG_EC_FP, KeyBuilder.LENGTH_EC_FP_256);
 
@@ -183,7 +190,7 @@ public class KeyStore {
 
 		// Allocate memory for keys
 		for (short i = 0; i < keys.length; i++) {
-			keys[i] = new EncryptedPrivateKey(PRIVATE_KEY_LENGTH);
+			keys[i] = new EncryptedPrivateKey();
 		}
 	}
 
@@ -331,20 +338,27 @@ public class KeyStore {
 	public void importPrivateKey(byte[] src, short addrOff, byte addrLength,
 			short keyOff, byte keyLength) {
 		findFirstFreePosition();
+
 		if (addressIndex == 0xFF) {
 			CardRuntimeException.throwIt(StatusCodes.KEYSTORE_FULL);
 		}
+
 		if ((short) (addrLength & 0xFF) > BitcoinAddress.MAX_ADDRESS_LENGTH) {
 			CardRuntimeException.throwIt(StatusCodes.WRONG_ADDRESS_LENGTH);
+		}
+
+		if ((short) (keyLength & 0xFF) > MAX_PRIVATE_KEY_SIZE) {
+			CardRuntimeException.throwIt(StatusCodes.WRONG_PRIVATE_KEY_LENGTH);
 		}
 
 		addressToKeyIndexMap[addressIndex].setAddress(src, addrOff, addrLength);
 
 		// Encrypt imported key and store in keys
-		aesCipher.init(aesKey, AES_ENCRYPTION_MODE);
-		short encryptedKeyLength = aesCipher.doFinal(src, keyOff, keyLength,
-				keyBuffer, (short) 0);
-		keys[addressIndex].setKey(keyBuffer, (short) 0 , encryptedKeyLength);
+		ECPrivateKey privKey = (ECPrivateKey) keyPair.getPrivate();
+		privKey.setS(src, keyOff, keyLength);
+
+		keys[addressIndex].setKey(keyBuffer, (short) 0,
+				encryptPrivateKey(privKey, keyBuffer, (short) 0));
 	}
 
 	/**
@@ -460,7 +474,9 @@ public class KeyStore {
 
 	/**
 	 * Encrypts the given private key with the AES key of this store.</br>
-	 * Uses {@link #encryptionBuffer}
+	 * Uses {@link #encryptedBuffer}.</br>
+	 * If the length is too short to suit the 128bits block size, additional
+	 * random values are appended.
 	 * 
 	 * @param privateKey The private key to encrypt
 	 * @param dest The destination, where the encrypted key is put
@@ -470,18 +486,28 @@ public class KeyStore {
 	 */
 	private short encryptPrivateKey(ECPrivateKey privateKey, byte[] dest,
 			short destOff) {
-		short keyLength = privateKey.getS(encryptionBuffer, (short) 0);
+		short keyLength = privateKey.getS(encryptedBuffer, (short) 1);
+
+		if (keyLength > MAX_PRIVATE_KEY_SIZE) {
+			CardRuntimeException.throwIt(StatusCodes.WRONG_PRIVATE_KEY_LENGTH);
+		}
+
+		encryptedBuffer[0] = (byte) keyLength;
+
+		// Fill remaining bytes with random data
+		RandomData.getInstance(RandomData.ALG_SECURE_RANDOM).generateData(
+				encryptedBuffer, (short) (keyLength + 1),
+				(short) (64 - keyLength - 1));
 
 		aesCipher.init(aesKey, Cipher.MODE_ENCRYPT);
-		aesCipher
-				.doFinal(encryptionBuffer, (short) 0, keyLength, dest, destOff);
 
-		return destOff;
+		return aesCipher.doFinal(encryptedBuffer, (short) 0, (short) 64, dest,
+				destOff);
 	}
 
 	/**
 	 * Decrypts the given private key with the AES key of this store.</br>
-	 * Uses {@link #encryptionBuffer}
+	 * Uses {@link #encryptedBuffer}.
 	 * 
 	 * @param privateKey The private key to decrypt
 	 * @param dest The destination, where the decrypted key is put
@@ -491,13 +517,16 @@ public class KeyStore {
 	 */
 	private short decryptPrivateKey(EncryptedPrivateKey privateKey,
 			byte[] dest, short destOff) {
-		short keyLength = privateKey.getKey(encryptionBuffer, (short) 0);
+		short keyLength = privateKey.getKey(encryptedBuffer, (short) 0);
 
 		aesCipher.init(aesKey, Cipher.MODE_DECRYPT);
-		aesCipher
-				.doFinal(encryptionBuffer, (short) 0, keyLength, dest, destOff);
+		aesCipher.doFinal(encryptedBuffer, (short) 0, keyLength,
+				encryptedBuffer, (short) 0);
 
-		return destOff;
+		Util.arrayCopy(encryptedBuffer, (short) 1, dest, destOff,
+				encryptedBuffer[0]);
+
+		return (short) encryptedBuffer[0];
 	}
 
 	/**
