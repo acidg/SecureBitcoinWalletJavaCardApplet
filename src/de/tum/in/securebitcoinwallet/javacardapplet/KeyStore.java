@@ -423,7 +423,7 @@ public class KeyStore {
 	/**
 	 * Calculates the amount of free key slots.
 	 */
-	public short getNumberofKeysRemaining() {
+	public short getNumberOfKeysRemaining() {
 		return (short) (keys.length - getNumberOfKeys());
 	}
 
