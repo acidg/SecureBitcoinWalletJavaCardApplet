@@ -45,13 +45,12 @@ public abstract interface AppletInstructions {
 	/**
 	 * Sign Bitcoin transaction instruction.
 	 */
-	@Deprecated
-	public static final byte INS_SIGN_TRANSACTION = (byte) 0xAB;
-
-	/**
-	 * Sign Bitcoin transaction instruction.
-	 */
 	public static final byte INS_SIGN_SHA256_HASH = (byte) 0xAC;
+	
+	/**
+	 * Generate new key pair instruction.
+	 */
+	public static final byte INS_GENERATE_KEY = (byte) 0xAD;
 	
 	/**
 	 * Put private key instruction.

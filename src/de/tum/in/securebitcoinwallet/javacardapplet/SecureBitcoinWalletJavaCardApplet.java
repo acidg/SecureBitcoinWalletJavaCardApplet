@@ -173,9 +173,6 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 		case AppletInstructions.INS_SELECT_KEY:
 			selectKey(apdu, buffer);
 			break;
-		case AppletInstructions.INS_SIGN_TRANSACTION:
-			signTransaction(apdu, buffer);
-			break;
 		case AppletInstructions.INS_SIGN_SHA256_HASH:
 			signSHA256Hash(apdu, buffer);
 			break;
