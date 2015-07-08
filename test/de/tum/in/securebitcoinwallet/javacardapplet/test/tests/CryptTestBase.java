@@ -9,6 +9,9 @@ public abstract class CryptTestBase extends AppletTestBase {
 	protected final static String PRIVATE_KEY_STRING = "5JY6U1SZMhUsWi7KCxo8frPTTSwDvd3VJ6Ma4t4T9aEiDLHV5gV";
 	protected final static String PUBLIC_KEY_STRING = "048d03747cf848dfb5384223c7128a95bc856a9741584d08cd4baa0db9ae895e49fb273edf7e99b7ced6cb2c732a1481727abb9b6f5ff9c28370f4f654645a9c53";
 
+	/**
+	 * Initializes the KeyStore with a private key
+	 */
 	public CryptTestBase() {
 		super();
 		assertTrue(commandSuccessful(authenticate(SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN)));
