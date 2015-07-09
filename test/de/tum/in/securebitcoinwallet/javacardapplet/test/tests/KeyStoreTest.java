@@ -1,37 +1,52 @@
 package de.tum.in.securebitcoinwallet.javacardapplet.test.tests;
 
+import static org.junit.Assert.assertTrue;
+
 import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+
+import javax.smartcardio.CardException;
+import javax.smartcardio.CommandAPDU;
 
 import org.junit.Test;
 
 import de.tum.in.securebitcoinwallet.javacardapplet.AppletInstructions;
 
 public class KeyStoreTest extends CryptTestBase {
+	public KeyStoreTest() throws CardException {
+		super();
+	}
+
 	private static final String HASHABLE_TEXT = "SecureBitcoinWallet";
 
 	/**
 	 * Checks whether the imported key is usable
+	 * 
+	 * @throws CardException
 	 */
 	@Test
-	public void testKeyImport() {
+	public void testKeyImport() throws CardException {
 		testSignature();
 	}
 
 	/**
 	 * Signs a string with the smartcard and checks whether the signature is
 	 * valid.
+	 * 
+	 * @throws CardException
 	 */
-	private void testSignature() {
+	private void testSignature() throws CardException {
 		byte[] hash = getSHA256Hash(HASHABLE_TEXT);
 
-		byte[] signInstructionHeader = {
+		CommandAPDU signInstruction = new CommandAPDU(
 				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
-				AppletInstructions.INS_SIGN_SHA256_HASH, 0x00, 0x00
-		};
-		
-		// TODO implement
+				AppletInstructions.INS_SIGN_SHA256_HASH, 0, 0, hash);
+
+		selectPrivateKey(BITCOIN_ADDRESS_STRING.getBytes());
+
+		byte[] response = channel.transmit(signInstruction).getBytes();
+		System.out.println(getHexString(response));
 	}
 
 	/**
@@ -56,4 +71,18 @@ public class KeyStoreTest extends CryptTestBase {
 		return md.digest();
 	}
 
+	/**
+	 * Selects the given private key for signing.
+	 * 
+	 * @param bitcoinAddress The private key's Bitcoin address
+	 * @throws CardException 
+	 */
+	private void selectPrivateKey(byte[] bitcoinAddress) throws CardException {
+		CommandAPDU selectPrivateKeyInstruction = new CommandAPDU(
+				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
+				AppletInstructions.INS_SELECT_KEY, 0, 0, bitcoinAddress);
+
+		assertTrue(commandSuccessful(channel.transmit(
+				selectPrivateKeyInstruction).getBytes()));
+	}
 }

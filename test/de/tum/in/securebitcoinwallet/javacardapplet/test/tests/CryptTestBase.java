@@ -1,6 +1,10 @@
 package de.tum.in.securebitcoinwallet.javacardapplet.test.tests;
 
 import static org.junit.Assert.assertTrue;
+
+import javax.smartcardio.CardException;
+import javax.smartcardio.CommandAPDU;
+
 import de.tum.in.securebitcoinwallet.javacardapplet.AppletInstructions;
 import de.tum.in.securebitcoinwallet.javacardapplet.SecureBitcoinWalletJavaCardApplet;
 
@@ -11,36 +15,21 @@ public abstract class CryptTestBase extends AppletTestBase {
 
 	/**
 	 * Initializes the KeyStore with a private key
+	 * @throws CardException 
 	 */
-	public CryptTestBase() {
+	public CryptTestBase() throws CardException {
 		super();
 		assertTrue(commandSuccessful(authenticate(SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN)));
-		byte[] bitcoinAdress = BITCOIN_ADDRESS_STRING.getBytes();
-		byte[] privateKey = PRIVATE_KEY_STRING.getBytes();
 
-		byte[] importKeyInstructionHeader = {
+		CommandAPDU importKeyInstruction = new CommandAPDU(
 				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
 				AppletInstructions.INS_IMPORT_PRIVATE_KEY,
-				(byte) bitcoinAdress.length, (byte) privateKey.length,
-				(byte) (bitcoinAdress.length + privateKey.length) };
+				BITCOIN_ADDRESS_STRING.getBytes().length,
+				PRIVATE_KEY_STRING.getBytes().length,
+				(BITCOIN_ADDRESS_STRING + PRIVATE_KEY_STRING).getBytes());
 
-		byte[] importKeyInstruction = new byte[importKeyInstructionHeader.length
-				+ bitcoinAdress.length + privateKey.length];
 
-		// Assemble apdu
-		for (int i = 0; i < importKeyInstructionHeader.length; i++) {
-			importKeyInstruction[i] = importKeyInstructionHeader[i];
-		}
-		int offset = importKeyInstructionHeader.length;
-		for (int i = 0; i < bitcoinAdress.length; i++) {
-			importKeyInstruction[i + offset] = bitcoinAdress[i];
-		}
-		offset += bitcoinAdress.length;
-		for (int i = 0; i < privateKey.length; i++) {
-			importKeyInstruction[i + offset] = privateKey[i];
-		}
-
-		assertTrue(commandSuccessful(simulator
-				.transmitCommand(importKeyInstruction)));
+		assertTrue(commandSuccessful(channel
+				.transmit(importKeyInstruction).getBytes()));
 	}
 }

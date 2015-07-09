@@ -143,7 +143,7 @@ public class KeyStore {
 		encryptedBuffer = new byte[64];
 		base58Buffer = new byte[256];
 
-		RandomData.getInstance(RandomData.ALG_SECURE_RANDOM).generateData(
+		RandomData.getInstance(RandomData.ALG_KEYGENERATION).nextBytes(
 				keyBuffer, (short) 0, (short) (ENCRYPTION_KEY_LENGTH / 8));
 
 		aesKey = (AESKey) KeyBuilder.buildKey(ENCRYPTION_KEY_TYPE,
@@ -277,8 +277,7 @@ public class KeyStore {
 		ECPrivateKey privateKey = (ECPrivateKey) keyPair.getPrivate();
 		privateKey.setS(keyBuffer, (short) 0, keyLength);
 
-		Signature signature = Signature.getInstance(Signature.ALG_HMAC_SHA_256,
-				false);
+		Signature signature = Signature.getInstance(Signature.ALG_ECDSA_SHA_256, false);
 		signature.init(privateKey, Signature.MODE_SIGN);
 
 		return signature.sign(src, msgOff, msgLength, dest, destOff);
@@ -495,7 +494,7 @@ public class KeyStore {
 		encryptedBuffer[0] = (byte) keyLength;
 
 		// Fill remaining bytes with random data
-		RandomData.getInstance(RandomData.ALG_SECURE_RANDOM).generateData(
+		RandomData.getInstance(RandomData.ALG_KEYGENERATION).nextBytes(
 				encryptedBuffer, (short) (keyLength + 1),
 				(short) (64 - keyLength - 1));
 

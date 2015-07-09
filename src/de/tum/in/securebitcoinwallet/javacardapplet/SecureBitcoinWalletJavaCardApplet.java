@@ -97,6 +97,10 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 */
 	private KeyStore keyStore;
 
+	/**
+	 * Buffer used to store the sha256 hash. See
+	 * {@link #signSHA256Hash(APDU, byte[])}.
+	 */
 	private byte[] sha256TransactionHash;
 
 	/**
@@ -176,6 +180,9 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 		case AppletInstructions.INS_SIGN_SHA256_HASH:
 			signSHA256Hash(apdu, buffer);
 			break;
+		case AppletInstructions.INS_GENERATE_KEY:
+			generateKey(apdu, buffer);
+			break;
 		case AppletInstructions.INS_IMPORT_PRIVATE_KEY:
 			importPrivateKey(apdu, buffer);
 			break;
@@ -209,7 +216,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 			ISOException.throwIt(ISO7816.SW_COMMAND_NOT_ALLOWED);
 		}
 
-		RandomData.getInstance(RandomData.ALG_SECURE_RANDOM).generateData(
+		RandomData.getInstance(RandomData.ALG_FAST).nextBytes(
 				buffer, (short) 0, PUK_SIZE);
 		puk.update(buffer, (short) 0, PUK_SIZE);
 
@@ -356,49 +363,6 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	}
 
 	/**
-	 * Signs the given transaction with the corresponding private key of the
-	 * previously selected key, see: {@link #selectKey()}.
-	 * 
-	 * <pre>
-	 * INS:	0xAB
-	 * P1:	Mode: INIT 0x01, UPDATE 0x02, FINAL 0x03
-	 * P2:	0x00
-	 * Lc:	Length of data
-	 * Data: Data to sign
-	 * 
-	 * Return: The signature, if P1 is set to final.
-	 * </pre>
-	 */
-	@Deprecated
-	private void signTransaction(APDU apdu, byte[] buffer) {
-		if (!pin.isValidated()) {
-			ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
-		}
-
-		if (apdu.setIncomingAndReceive() == 0) {
-			ISOException.throwIt(ISO7816.SW_DATA_INVALID);
-		}
-
-		switch (buffer[ISO7816.OFFSET_P1]) {
-		case SIGN_MODE_INIT:
-			keyStore.signMessageInit(buffer, ISO7816.OFFSET_CDATA,
-					buffer[ISO7816.OFFSET_LC]);
-			break;
-		case SIGN_MODE_UPDATE:
-			keyStore.signMessageUpdate(buffer, ISO7816.OFFSET_CDATA,
-					buffer[ISO7816.OFFSET_LC]);
-			break;
-		case SIGN_MODE_FINAL:
-			apdu.setOutgoingAndSend((short) 0, keyStore.signMessageFinal(
-					buffer, ISO7816.OFFSET_CDATA, buffer[ISO7816.OFFSET_LC],
-					buffer, (short) 0));
-			break;
-		default:
-			ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
-		}
-	}
-
-	/**
 	 * Sign the given SHA256Hash of a Bitcoin transcation with the corresponding
 	 * private key of the previously selected key, see: {@link #selectKey()}.
 	 * 
@@ -406,7 +370,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * INS:	0xAC
 	 * P1:	0x00
 	 * P2:	0x00
-	 * Lc:	Length of hash, should be less than 64 bytes.
+	 * Lc:	Length of hash, should be 32 bytes.
 	 * Data: SHA256 hash of the Bitcoin transcation
 	 * 
 	 * Return: The signature of the given hash.
@@ -422,7 +386,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 			ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
 		}
 
-		if ((buffer[ISO7816.OFFSET_LC] & 0xFF) >= 0x40) {
+		if ((buffer[ISO7816.OFFSET_LC] & 0xFF) != 0x20) {
 			ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
 		}
 
@@ -436,6 +400,37 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 		apdu.setOutgoingAndSend((short) 0, keyStore.signMessage(buffer,
 				ISO7816.OFFSET_CDATA, buffer[ISO7816.OFFSET_LC], buffer,
 				(short) 0));
+	}
+
+	/**
+	 * Generates a new private and public keypair. The private key is stored
+	 * inside the keystore. The public key is returned.
+	 *
+	 * <pre>
+	 * INS:	0xAD
+	 * P1:	0x00
+	 * P2:	0x00
+	 * Lc:	0x00
+	 * 
+	 * Return: The generated public key
+	 * </pre>
+	 */
+	private void generateKey(APDU apdu, byte[] buffer) {
+		if (!pin.isValidated()) {
+			ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+		}
+
+		if (buffer[ISO7816.OFFSET_P1] != 0x00
+				|| buffer[ISO7816.OFFSET_P2] != 0x00) {
+			ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
+		}
+
+		if (buffer[ISO7816.OFFSET_LC] != 0x00) {
+			ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+		}
+
+		apdu.setOutgoingAndSend((short) 0,
+				keyStore.generateKeyPair(buffer, (short) 0));
 	}
 
 	/**

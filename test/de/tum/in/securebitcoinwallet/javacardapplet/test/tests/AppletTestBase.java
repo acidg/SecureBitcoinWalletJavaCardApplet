@@ -2,13 +2,16 @@ package de.tum.in.securebitcoinwallet.javacardapplet.test.tests;
 
 import java.util.Arrays;
 
-import javacard.framework.AID;
 import javacard.framework.ISO7816;
 import javacard.framework.Util;
 
-import org.bouncycastle.util.encoders.Hex;
-
-import com.licel.jcardsim.base.Simulator;
+import javax.smartcardio.Card;
+import javax.smartcardio.CardChannel;
+import javax.smartcardio.CardException;
+import javax.smartcardio.CardTerminal;
+import javax.smartcardio.CommandAPDU;
+import javax.smartcardio.ResponseAPDU;
+import javax.smartcardio.TerminalFactory;
 
 import de.tum.in.securebitcoinwallet.javacardapplet.AppletInstructions;
 import de.tum.in.securebitcoinwallet.javacardapplet.SecureBitcoinWalletJavaCardApplet;
@@ -24,28 +27,33 @@ public abstract class AppletTestBase {
 	 * The AID of the Secure Bitcoin Wallet Applet.
 	 */
 	protected static final String AID = "01020304050607080900";
-	/**
-	 * Simulator used for testing.
-	 */
-	protected final Simulator simulator = new Simulator();
 
 	protected final byte[] puk;
+
+	protected CardChannel channel;
 
 	/**
 	 * Constructor. Initializes the simulator and selects the applet. Also calls
 	 * the setup instruction and retrieves the PUK.
+	 * 
+	 * @throws CardException
 	 */
-	public AppletTestBase() {
-		byte[] aidBytes = Hex.decode(AID);
-		AID aid = new AID(aidBytes, (short) 0, (byte) aidBytes.length);
-		simulator.installApplet(aid, SecureBitcoinWalletJavaCardApplet.class);
-		simulator.selectApplet(aid);
-
-		byte[] setupInstruction = {
+	public AppletTestBase() throws CardException {
+		CommandAPDU setupInstruction = new CommandAPDU(
 				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
-				AppletInstructions.INS_SETUP, 0x00, 0x00 };
+				AppletInstructions.INS_SETUP, 0, 0);
 
-		puk = Arrays.copyOf(simulator.transmitCommand(setupInstruction),
+		TerminalFactory factory = TerminalFactory.getDefault();
+		CardTerminal terminal = factory.terminals().list().get(0);
+		// establish a connection with the card
+		Card card = null;
+		card = terminal.connect("*");
+		System.out.println("card: " + card);
+		channel = card.getBasicChannel();
+		ResponseAPDU r = channel.transmit(setupInstruction);
+		System.out.println("response: " + getHexString(r.getBytes()));
+
+		puk = Arrays.copyOf(r.getBytes(),
 				SecureBitcoinWalletJavaCardApplet.PUK_SIZE);
 	}
 
@@ -54,8 +62,9 @@ public abstract class AppletTestBase {
 	 *
 	 * @param pin The PIN to authenticate with
 	 * @return The response from the SmartCard
+	 * @throws CardException
 	 */
-	protected byte[] authenticate(byte[] pin) {
+	protected byte[] authenticate(byte[] pin) throws CardException {
 		byte[] apduHeader = { AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
 				AppletInstructions.INS_AUTHENTICATE, 0x00, 0x00,
 				(byte) pin.length };
@@ -68,8 +77,8 @@ public abstract class AppletTestBase {
 		for (int i = 0; i < pin.length; i++) {
 			apdu[i + apduHeader.length] = pin[i];
 		}
-		
-		return simulator.transmitCommand(apdu);
+
+		return channel.transmit(new CommandAPDU(apdu)).getBytes();
 	}
 
 	/**

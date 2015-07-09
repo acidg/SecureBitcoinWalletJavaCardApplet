@@ -6,11 +6,10 @@ import org.junit.runners.Suite.SuiteClasses;
 
 import de.tum.in.securebitcoinwallet.javacardapplet.test.tests.KeyStoreTest;
 import de.tum.in.securebitcoinwallet.javacardapplet.test.tests.PINTest;
-import de.tum.in.securebitcoinwallet.javacardapplet.test.tests.SignatureTest;
 import de.tum.in.securebitcoinwallet.javacardapplet.test.tests.UtilTest;
 
 @RunWith(Suite.class)
-@SuiteClasses({ KeyStoreTest.class, PINTest.class, UtilTest.class, SignatureTest.class})
+@SuiteClasses({ KeyStoreTest.class, PINTest.class, UtilTest.class})
 public class TestApplet {
 
 }
