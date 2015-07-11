@@ -97,11 +97,6 @@ public class KeyStore {
 	private MessageDigest sha256Digest;
 
 	/**
-	 * Digest used for hashing with RIPEMD160.
-	 */
-	private MessageDigest ripemd160Digest;
-
-	/**
 	 * Buffer used to encrypt private keys and temporary store key data.
 	 */
 	private byte[] keyBuffer;
@@ -113,9 +108,9 @@ public class KeyStore {
 	private byte[] encryptedBuffer;
 
 	/**
-	 * Buffer for base58 encoding.
+	 * Buffer for RIPEMD160 hashing and base58 encoding.
 	 */
-	private byte[] base58Buffer;
+	private byte[] hashBuffer;
 
 	/**
 	 * Constructor. Has to be called inside the constructor of the applet to
@@ -141,9 +136,9 @@ public class KeyStore {
 
 		keyBuffer = new byte[256];
 		encryptedBuffer = new byte[64];
-		base58Buffer = new byte[256];
+		hashBuffer = new byte[256];
 
-		RandomData.getInstance(RandomData.ALG_KEYGENERATION).nextBytes(
+		RandomData.getInstance(RandomData.ALG_SECURE_RANDOM).generateData(
 				keyBuffer, (short) 0, (short) (ENCRYPTION_KEY_LENGTH / 8));
 
 		aesKey = (AESKey) KeyBuilder.buildKey(ENCRYPTION_KEY_TYPE,
@@ -178,9 +173,6 @@ public class KeyStore {
 		sha256Digest = MessageDigest.getInstance(MessageDigest.ALG_SHA_256,
 				false);
 
-		ripemd160Digest = MessageDigest.getInstance(
-				MessageDigest.ALG_RIPEMD160, false);
-
 		addressToKeyIndexMap = new BitcoinAddress[storeSize];
 
 		// Allocate memory for addresses
@@ -214,44 +206,6 @@ public class KeyStore {
 	}
 
 	/**
-	 * Initializes the signature process.
-	 * 
-	 * @param src The buffer, in which the data to sign can be found.
-	 * @param msgOffset The offset if the data inside the buffer
-	 * @param msgLength The length of the data to sign
-	 */
-	@Deprecated
-	public void signMessageInit(byte[] src, short msgOffset, short msgLength) {
-		signature = Signature.getInstance(Signature.ALG_HMAC_SHA_256, false);
-		signature.init(keyPair.getPrivate(), Signature.ALG_HMAC_SHA_256);
-	}
-
-	/**
-	 * Updates the signature with additional data.
-	 * 
-	 * @param src The buffer, in which the data to sign can be found.
-	 * @param msgOffset The offset if the data inside the buffer
-	 * @param msgLength The length of the data to sign
-	 */
-	@Deprecated
-	public void signMessageUpdate(byte[] src, short msgOffset, short msgLength) {
-
-	}
-
-	/**
-	 * Finalizes the signature with the last chunk data.
-	 * 
-	 * @param src The buffer, in which the data to sign can be found.
-	 * @param msgOffset The offset if the data inside the buffer
-	 * @param msgLength The length of the data to sign
-	 */
-	@Deprecated
-	public short signMessageFinal(byte[] src, short msgOffset, short msgLength,
-			byte[] dest, short destOff) {
-		return 0;
-	}
-
-	/**
 	 * Signs the given sha256Hash with the key of the previously selected
 	 * private key. Input
 	 * and output buffer may overlap.
@@ -277,7 +231,7 @@ public class KeyStore {
 		ECPrivateKey privateKey = (ECPrivateKey) keyPair.getPrivate();
 		privateKey.setS(keyBuffer, (short) 0, keyLength);
 
-		Signature signature = Signature.getInstance(Signature.ALG_ECDSA_SHA_256, false);
+		signature = Signature.getInstance(Signature.ALG_ECDSA_SHA_256, false);
 		signature.init(privateKey, Signature.MODE_SIGN);
 
 		return signature.sign(src, msgOff, msgLength, dest, destOff);
@@ -490,11 +444,11 @@ public class KeyStore {
 		if (keyLength > MAX_PRIVATE_KEY_SIZE) {
 			CardRuntimeException.throwIt(StatusCodes.WRONG_PRIVATE_KEY_LENGTH);
 		}
-
+		
 		encryptedBuffer[0] = (byte) keyLength;
 
 		// Fill remaining bytes with random data
-		RandomData.getInstance(RandomData.ALG_KEYGENERATION).nextBytes(
+		RandomData.getInstance(RandomData.ALG_SECURE_RANDOM).generateData(
 				encryptedBuffer, (short) (keyLength + 1),
 				(short) (64 - keyLength - 1));
 
@@ -532,7 +486,7 @@ public class KeyStore {
 	 * Calculates the Bitcoin address from the given public key. The address
 	 * will be stored in the {@link #keyBuffer}.
 	 * </br>
-	 * Uses {@link #base58Buffer}.
+	 * Uses {@link #hashBuffer}.
 	 * </br>
 	 * See <a href=
 	 * "https://en.bitcoin.it/wiki/Technical_background_of_version_1_Bitcoin_addresses#How_to_create_Bitcoin_Address"
@@ -555,8 +509,9 @@ public class KeyStore {
 				keyLength, keyBuffer, (short) 0);
 
 		// Calculate ripemd160 hash of sha256 hash
-		short ripemd160Length = ripemd160Digest.doFinal(keyBuffer, (short) 0,
-				sha256Length, keyBuffer, (short) 1);
+		Ripemd160.hash32(keyBuffer, (short) 0, keyBuffer, (short) 0, hashBuffer, (short) 0);
+		
+		short ripemd160Length = 32;
 
 		// Add version byte (0x00 for Main Network)
 		keyBuffer[0] = (byte) 0x00;
@@ -574,6 +529,6 @@ public class KeyStore {
 		// Calculate the base58 encoded address and return its length
 		return Base58.encode(keyBuffer, (short) 0,
 				(short) (ripemd160Length + 5), keyBuffer, (short) 0,
-				base58Buffer, (short) 0);
+				hashBuffer, (short) 0);
 	}
 }
