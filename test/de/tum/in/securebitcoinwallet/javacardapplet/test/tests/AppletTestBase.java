@@ -1,9 +1,14 @@
 package de.tum.in.securebitcoinwallet.javacardapplet.test.tests;
 
+import static org.junit.Assert.assertTrue;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 
 import javacard.framework.ISO7816;
-import javacard.framework.Util;
 
 import javax.smartcardio.Card;
 import javax.smartcardio.CardChannel;
@@ -24,12 +29,24 @@ import de.tum.in.securebitcoinwallet.javacardapplet.SecureBitcoinWalletJavaCardA
 public abstract class AppletTestBase {
 
 	/**
+	 * The AID of the Issuer Security Domain.
+	 */
+	protected static final byte[] ISD_AID = { (byte) 0xA0, 0x00, 0x00, 0x01,
+			0x51, 0x00, 0x00, 0x00 };
+	/**
 	 * The AID of the Secure Bitcoin Wallet Applet.
 	 */
-	protected static final String AID = "01020304050607080900";
+	protected static final byte[] AID = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+			0x07, 0x08, 0x09, 0x00 };
 
-	protected final byte[] puk;
+	/**
+	 * PUK.
+	 */
+	protected byte[] puk;
 
+	/**
+	 * CardChannel used to transmit commands.
+	 */
 	protected CardChannel channel;
 
 	/**
@@ -37,24 +54,53 @@ public abstract class AppletTestBase {
 	 * the setup instruction and retrieves the PUK.
 	 * 
 	 * @throws CardException
+	 * @throws IOException
 	 */
 	public AppletTestBase() throws CardException {
-		CommandAPDU setupInstruction = new CommandAPDU(
-				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
-				AppletInstructions.INS_SETUP, 0, 0);
-
 		TerminalFactory factory = TerminalFactory.getDefault();
+
 		CardTerminal terminal = factory.terminals().list().get(0);
 		// establish a connection with the card
 		Card card = null;
 		card = terminal.connect("*");
-		System.out.println("card: " + card);
 		channel = card.getBasicChannel();
-		ResponseAPDU r = channel.transmit(setupInstruction);
-		System.out.println("response: " + getHexString(r.getBytes()));
 
-		puk = Arrays.copyOf(r.getBytes(),
-				SecureBitcoinWalletJavaCardApplet.PUK_SIZE);
+		selectAID(AID);
+		checkPUK();
+	}
+
+	/**
+	 * Checks if the PUK has been already set.
+	 * 
+	 * @throws CardException
+	 */
+	private void checkPUK() throws CardException {
+		File pukFile = new File("bin/puk");
+		if (pukFile.exists()) {
+			try {
+				puk = Files.readAllBytes(pukFile.toPath());
+			} catch (IOException e) {
+				// Ignore and try setup
+			}
+		} else {
+			CommandAPDU setupInstruction = new CommandAPDU(
+					AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
+					AppletInstructions.INS_SETUP, 0, 0);
+			ResponseAPDU response = channel.transmit(setupInstruction);
+
+			assertTrue(commandSuccessful(response));
+
+			puk = Arrays.copyOf(response.getBytes(),
+					SecureBitcoinWalletJavaCardApplet.PUK_SIZE);
+
+			try {
+				Files.write(pukFile.toPath(), puk, StandardOpenOption.CREATE);
+			} catch (IOException e) {
+				throw new RuntimeException("PUK file could not be created in "
+						+ pukFile.getAbsolutePath() + "PUK: "
+						+ getHexString(puk));
+			}
+		}
 	}
 
 	/**
@@ -64,21 +110,12 @@ public abstract class AppletTestBase {
 	 * @return The response from the SmartCard
 	 * @throws CardException
 	 */
-	protected byte[] authenticate(byte[] pin) throws CardException {
-		byte[] apduHeader = { AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
-				AppletInstructions.INS_AUTHENTICATE, 0x00, 0x00,
-				(byte) pin.length };
+	protected ResponseAPDU authenticate(byte[] pin) throws CardException {
+		CommandAPDU authenticateCommand = new CommandAPDU(
+				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
+				AppletInstructions.INS_AUTHENTICATE, 0x00, 0x00, pin);
 
-		byte[] apdu = new byte[apduHeader.length + pin.length];
-
-		for (int i = 0; i < apduHeader.length; i++) {
-			apdu[i] = apduHeader[i];
-		}
-		for (int i = 0; i < pin.length; i++) {
-			apdu[i + apduHeader.length] = pin[i];
-		}
-
-		return channel.transmit(new CommandAPDU(apdu)).getBytes();
+		return channel.transmit(authenticateCommand);
 	}
 
 	/**
@@ -89,17 +126,34 @@ public abstract class AppletTestBase {
 	 * 
 	 * @return True, if the command was executed successfully, false otherwise.
 	 */
-	protected boolean commandSuccessful(byte[] response) {
-		short statusCode = Util.getShort(response,
-				(short) (response.length - 2));
+	protected boolean commandSuccessful(ResponseAPDU response) {
+		int statusCode = (short) response.getSW();
 		return ISO7816.SW_NO_ERROR == statusCode;
 	}
 
+	/**
+	 * Creates a String representing the given byte array in HEY notation.
+	 */
 	protected String getHexString(byte[] data) {
 		StringBuilder builder = new StringBuilder();
 		for (byte b : data) {
 			builder.append(String.format("%02X ", b) + " ");
 		}
 		return builder.toString();
+	}
+
+	/**
+	 * Sends the select aid APDU to the card.
+	 * 
+	 * @param aid The AID to select
+	 * @throws CardException
+	 */
+	private void selectAID(byte[] aid) throws CardException {
+		CommandAPDU selectAIDCommand = new CommandAPDU(0x00, 0xA4, 0x04, 0x00,
+				aid);
+
+		ResponseAPDU response = channel.transmit(selectAIDCommand);
+
+		assertTrue(commandSuccessful(response));
 	}
 }

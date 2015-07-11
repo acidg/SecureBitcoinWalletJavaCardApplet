@@ -216,7 +216,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 			ISOException.throwIt(ISO7816.SW_COMMAND_NOT_ALLOWED);
 		}
 
-		RandomData.getInstance(RandomData.ALG_FAST).nextBytes(
+		RandomData.getInstance(RandomData.ALG_SECURE_RANDOM).generateData(
 				buffer, (short) 0, PUK_SIZE);
 		puk.update(buffer, (short) 0, PUK_SIZE);
 
@@ -326,7 +326,6 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * INS:	0x08
 	 * P1:	0x00 
 	 * P2:	0x00
-	 * Lc:	0x00
 	 * 
 	 * Return: 0x01 if the PIN is validated, 0x00 otherwise.
 	 * </pre>
@@ -410,8 +409,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * INS:	0xAD
 	 * P1:	0x00
 	 * P2:	0x00
-	 * Lc:	0x00
-	 * 
+	 *
 	 * Return: The generated public key
 	 * </pre>
 	 */
@@ -423,10 +421,6 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 		if (buffer[ISO7816.OFFSET_P1] != 0x00
 				|| buffer[ISO7816.OFFSET_P2] != 0x00) {
 			ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
-		}
-
-		if (buffer[ISO7816.OFFSET_LC] != 0x00) {
-			ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
 		}
 
 		apdu.setOutgoingAndSend((short) 0,

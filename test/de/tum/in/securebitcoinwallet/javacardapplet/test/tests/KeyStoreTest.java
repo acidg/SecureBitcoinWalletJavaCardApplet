@@ -3,41 +3,107 @@ package de.tum.in.securebitcoinwallet.javacardapplet.test.tests;
 import static org.junit.Assert.assertTrue;
 
 import java.io.UnsupportedEncodingException;
+import java.security.KeyFactory;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.X509EncodedKeySpec;
+
+import javacard.security.ECPublicKey;
 
 import javax.smartcardio.CardException;
 import javax.smartcardio.CommandAPDU;
+import javax.smartcardio.ResponseAPDU;
 
 import org.junit.Test;
 
 import de.tum.in.securebitcoinwallet.javacardapplet.AppletInstructions;
+import de.tum.in.securebitcoinwallet.javacardapplet.SecureBitcoinWalletJavaCardApplet;
 
-public class KeyStoreTest extends CryptTestBase {
+public class KeyStoreTest extends AppletTestBase {
+	protected final static String BITCOIN_ADDRESS_STRING = "1P4nqAMxhF6PobyiDYm5jcUZd4CWPsGUy4";
+	protected final static String PRIVATE_KEY_STRING = "5JY6U1SZMhUsWi7KCxo8frPTTSwDvd3VJ6Ma4t4T9aEiDLHV5gV";
+	protected final static String PUBLIC_KEY_STRING = "048d03747cf848dfb5384223c7128a95bc856a9741584d08cd4baa0db9ae895e49fb273edf7e99b7ced6cb2c732a1481727abb9b6f5ff9c28370f4f654645a9c53";
+
 	public KeyStoreTest() throws CardException {
 		super();
 	}
 
+	/**
+	 * Text used for checking the signature.
+	 */
 	private static final String HASHABLE_TEXT = "SecureBitcoinWallet";
 
 	/**
-	 * Checks whether the imported key is usable
+	 * Tests the import key function.
 	 * 
 	 * @throws CardException
 	 */
 	@Test
 	public void testKeyImport() throws CardException {
-		testSignature();
-	}
+		assertTrue(commandSuccessful(authenticate(SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN)));
 
+		CommandAPDU importKeyInstruction = new CommandAPDU(
+				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
+				AppletInstructions.INS_IMPORT_PRIVATE_KEY,
+				BITCOIN_ADDRESS_STRING.getBytes().length,
+				PRIVATE_KEY_STRING.getBytes().length,
+				(BITCOIN_ADDRESS_STRING + PRIVATE_KEY_STRING).getBytes());
+
+		ResponseAPDU response = channel.transmit(importKeyInstruction);
+
+		assertTrue(commandSuccessful(response));
+
+		byte[] signature = getSignature(HASHABLE_TEXT);
+
+		ECPublicKey publicKey;
+		try {
+			publicKey = (ECPublicKey) KeyFactory.getInstance("EC").generatePublic(
+					new X509EncodedKeySpec(PUBLIC_KEY_STRING.getBytes()));
+		} catch (InvalidKeySpecException e) {
+			throw new RuntimeException(e);
+		} catch (NoSuchAlgorithmException e) {
+			throw new RuntimeException(e);
+		}
+
+		verifySignature(HASHABLE_TEXT, signature, publicKey);
+	}
+	
 	/**
-	 * Signs a string with the smartcard and checks whether the signature is
-	 * valid.
+	 * Tests the key generation function.
 	 * 
 	 * @throws CardException
 	 */
-	private void testSignature() throws CardException {
-		byte[] hash = getSHA256Hash(HASHABLE_TEXT);
+	@Test
+	public void testKeyGenerator() {
+		CommandAPDU generateKeyInstruction = new CommandAPDU(
+				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
+				AppletInstructions.INS_IMPORT_PRIVATE_KEY,
+				BITCOIN_ADDRESS_STRING.getBytes().length,
+				PRIVATE_KEY_STRING.getBytes().length,
+				(BITCOIN_ADDRESS_STRING + PRIVATE_KEY_STRING).getBytes());
+	}
+
+	/**
+	 * Verifies the given signature.
+	 * 
+	 * @param hashableText The text for which the sha256 hash has been
+	 *            calculated
+	 * @param signature The signature of the sha256 hash of the text
+	 * @param publicKey The public key to verify the singature
+	 */
+	private void verifySignature(String hashableText, byte[] signature,
+			ECPublicKey publicKey) {
+		// TODO implement
+	}
+
+	/**
+	 * Signs a string with the smartcard and returns its signature.
+	 * 
+	 * @throws CardException
+	 */
+	private byte[] getSignature(String input) throws CardException {
+		byte[] hash = getSHA256Hash(input);
 
 		CommandAPDU signInstruction = new CommandAPDU(
 				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
@@ -45,8 +111,8 @@ public class KeyStoreTest extends CryptTestBase {
 
 		selectPrivateKey(BITCOIN_ADDRESS_STRING.getBytes());
 
-		byte[] response = channel.transmit(signInstruction).getBytes();
-		System.out.println(getHexString(response));
+		ResponseAPDU response = channel.transmit(signInstruction);
+		return response.getBytes();
 	}
 
 	/**
@@ -75,14 +141,14 @@ public class KeyStoreTest extends CryptTestBase {
 	 * Selects the given private key for signing.
 	 * 
 	 * @param bitcoinAddress The private key's Bitcoin address
-	 * @throws CardException 
+	 * @throws CardException
 	 */
 	private void selectPrivateKey(byte[] bitcoinAddress) throws CardException {
 		CommandAPDU selectPrivateKeyInstruction = new CommandAPDU(
 				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
 				AppletInstructions.INS_SELECT_KEY, 0, 0, bitcoinAddress);
 
-		assertTrue(commandSuccessful(channel.transmit(
-				selectPrivateKeyInstruction).getBytes()));
+		assertTrue(commandSuccessful(channel
+				.transmit(selectPrivateKeyInstruction)));
 	}
 }

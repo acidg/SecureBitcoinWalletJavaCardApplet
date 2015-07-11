@@ -8,6 +8,5 @@ open_sc -security 1 -keyind 0 -keyver 1 -mac_key 404142434445464748494a4b4c4d4e4
 
 # Delete the applet
 delete -AID 01020304050607080900
-delete -AID 0102030405060708090000
 
 card_disconnect

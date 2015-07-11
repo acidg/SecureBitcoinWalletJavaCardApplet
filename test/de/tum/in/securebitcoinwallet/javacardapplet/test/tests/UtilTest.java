@@ -2,6 +2,7 @@ package de.tum.in.securebitcoinwallet.javacardapplet.test.tests;
 
 import javax.smartcardio.CardException;
 import javax.smartcardio.CommandAPDU;
+import javax.smartcardio.ResponseAPDU;
 
 import org.junit.Test;
 
@@ -18,7 +19,7 @@ public class UtilTest extends AppletTestBase {
 				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
 				AppletInstructions.INS_GET_REMAINING_MEMORY, 0, 0);
 
-		byte[] response = channel.transmit(apdu).getBytes();
+		ResponseAPDU response = channel.transmit(apdu);
 
 		commandSuccessful(response);
 	}
