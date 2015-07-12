@@ -4,5 +4,5 @@ MY_PATH="`dirname \"$0\"`"
 MY_PATH="`( cd \"$MY_PATH\" && pwd )`"
 
 gpshell $MY_PATH/deleteApplet.txt
-rm $MY_PATH/bin/puk
+rm $MY_PATH/../bin/puk
 gpshell $MY_PATH/installApplet.txt
