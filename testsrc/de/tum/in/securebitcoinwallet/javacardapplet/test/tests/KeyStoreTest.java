@@ -27,7 +27,6 @@ public class KeyStoreTest extends AppletTestBase {
 
 	public KeyStoreTest() throws CardException {
 		super();
-		assertTrue(commandSuccessful(authenticate(SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN)));
 	}
 
 	/**
@@ -42,6 +41,8 @@ public class KeyStoreTest extends AppletTestBase {
 	 */
 	@Test
 	public void testKeyImport() throws CardException {
+		assertTrue(authenticate(SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN));
+		
 		getSignature(HASHABLE_TEXT);
 		CommandAPDU importKeyInstruction = new CommandAPDU(
 				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
@@ -76,6 +77,8 @@ public class KeyStoreTest extends AppletTestBase {
 	 */
 	@Test
 	public void testKeyGenerator() throws CardException {
+		assertTrue(authenticate(SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN));
+		
 		CommandAPDU generateKeyInstruction = new CommandAPDU(
 				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
 				AppletInstructions.INS_IMPORT_PRIVATE_KEY,
@@ -96,6 +99,8 @@ public class KeyStoreTest extends AppletTestBase {
 	 */
 	@Test
 	public void testKeyExport() throws CardException {
+		assertTrue(authenticate(SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN));
+		
 		CommandAPDU getKeyInstruction = new CommandAPDU(
 				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
 				AppletInstructions.INS_GET_PRIVATE_KEY,0x00, 0x00,

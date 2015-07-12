@@ -248,8 +248,6 @@ public class KeyStore {
 	 * @return The length of the new public key in bytes.
 	 */
 	public short generateKeyPair(byte[] dest, short destOff) {
-		CardRuntimeException.throwIt((short) 0x1234);
-		
 		findFirstFreePosition();
 
 		if (addressIndex == 0xFF) {
@@ -292,8 +290,6 @@ public class KeyStore {
 	 */
 	public void importPrivateKey(byte[] src, short addrOff, byte addrLength,
 			short keyOff, byte keyLength) {
-
-		CardRuntimeException.throwIt((short) 0x1235);
 		findFirstFreePosition();
 
 		if (addressIndex == 0xFF) {

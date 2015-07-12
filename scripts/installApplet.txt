@@ -35,7 +35,7 @@ open_sc -security 1 -keyind 0 -keyver 1 -mac_key 404142434445464748494a4b4c4d4e4
 # Load and installs an applet in one step
 # The parameters -AID -instAID -pkgAID -nvCodeLimit can be detected automatically and the -AID and -instAID is set to the first applet in appletfile.
 # For the sdAID the AID selected with the select command is chosen if not given. Otherwise the default Card Manager / Security Issuer Domain AID is chosen. So usually you do not have to pass it.
-install -file ../bin/cap/javacard.cap -instParam 00 -priv 2
+install -file bin/cap/javacard.cap -instParam 00 -priv 2
 
 # Select the applet.
 #select -AID 0102030405060708090000

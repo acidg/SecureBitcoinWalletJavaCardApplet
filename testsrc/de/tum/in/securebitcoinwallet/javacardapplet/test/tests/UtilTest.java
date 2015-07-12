@@ -21,7 +21,11 @@ public class UtilTest extends AppletTestBase {
 				AppletInstructions.INS_GET_REMAINING_MEMORY, 0, 0);
 
 		ResponseAPDU response = smartCard.transmit(apdu);
-
+		
+		byte[] data = response.getData();
+		
+		System.out.println("Remaining Slots: " + ((data[0] << 8) + data[1]));
+		
 		assertTrue(commandSuccessful(response));
 	}
 }

@@ -1,25 +1,18 @@
 package de.tum.in.securebitcoinwallet.javacardapplet.test.tests;
 
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
 
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.StandardOpenOption;
-import java.util.Arrays;
 
 import javacard.framework.ISO7816;
 
-import javax.smartcardio.Card;
-import javax.smartcardio.CardChannel;
 import javax.smartcardio.CardException;
-import javax.smartcardio.CardTerminal;
 import javax.smartcardio.CommandAPDU;
 import javax.smartcardio.ResponseAPDU;
-import javax.smartcardio.TerminalFactory;
 
 import de.tum.in.securebitcoinwallet.javacardapplet.AppletInstructions;
-import de.tum.in.securebitcoinwallet.javacardapplet.SecureBitcoinWalletJavaCardApplet;
+import de.tum.in.securebitcoinwallet.javacardapplet.StatusCodes;
 import de.tum.in.securebitcoinwallet.javacardapplet.test.JavaCard;
 import de.tum.in.securebitcoinwallet.javacardapplet.test.JavaCardHardware;
 import de.tum.in.securebitcoinwallet.javacardapplet.test.JavaCardSimulator;
@@ -32,7 +25,7 @@ import de.tum.in.securebitcoinwallet.javacardapplet.test.JavaCardSimulator;
 public abstract class AppletTestBase {
 
 	private boolean USE_SIMULATOR = false;
-	
+
 	/**
 	 * The AID of the Issuer Security Domain.
 	 */
@@ -67,7 +60,7 @@ public abstract class AppletTestBase {
 		} else {
 			smartCard = new JavaCardHardware(AID);
 		}
-		
+
 		puk = smartCard.setup();
 	}
 
@@ -99,14 +92,47 @@ public abstract class AppletTestBase {
 	 * Authenticate at the smartcard with the given PIN.
 	 *
 	 * @param pin The PIN to authenticate with
-	 * @return The response from the SmartCard
+	 * @return True, if the authentication was successful, false otherwise
 	 * @throws CardException
 	 */
-	protected ResponseAPDU authenticate(byte[] pin) throws CardException {
+	protected boolean authenticate(byte[] pin) throws CardException {
 		CommandAPDU authenticateCommand = new CommandAPDU(
 				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
 				AppletInstructions.INS_AUTHENTICATE, 0x00, 0x00, pin);
 	
-		return smartCard.transmit(authenticateCommand);
+		ResponseAPDU response = smartCard.transmit(authenticateCommand);
+		
+		boolean result = false;
+		
+		switch (response.getSW()) {
+		case StatusCodes.SW_AUTH_FAILED:
+		case StatusCodes.SW_CARD_LOCKED:
+			break;
+		case ISO7816.SW_NO_ERROR:
+			result = true;
+		default:
+			throw new RuntimeException("Unknown StatusCode: " + getHexString(response.getBytes()));
+		}
+		
+		assertEquals(checkPINValidated(), result);
+		return result;
+	}
+
+	/**
+	 * Checks if the PIN has been validated.
+	 * 
+	 * @return True, if the previous PIN validation was successful.
+	 * @throws CardException
+	 */
+	protected boolean checkPINValidated() throws CardException {
+		CommandAPDU isValidatedCommand = new CommandAPDU(
+				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
+				AppletInstructions.INS_PIN_VALIDATED, 0, 0);
+
+		ResponseAPDU response = smartCard.transmit(isValidatedCommand);
+
+		assertTrue(commandSuccessful(response));
+
+		return response.getBytes()[0] == 1 ? true : false;
 	}
 }

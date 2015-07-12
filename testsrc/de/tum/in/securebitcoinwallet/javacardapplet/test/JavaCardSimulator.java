@@ -2,10 +2,6 @@ package de.tum.in.securebitcoinwallet.javacardapplet.test;
 
 import static org.junit.Assert.assertTrue;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 
 import javacard.framework.AID;
@@ -13,8 +9,6 @@ import javacard.framework.AID;
 import javax.smartcardio.CardException;
 import javax.smartcardio.CommandAPDU;
 import javax.smartcardio.ResponseAPDU;
-
-import org.bouncycastle.util.encoders.Hex;
 
 import com.licel.jcardsim.base.Simulator;
 

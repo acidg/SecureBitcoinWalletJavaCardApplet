@@ -17,6 +17,9 @@
 	    <applet class="de.tum.in.securebitcoinwallet.javacardapplet.SecureBitcoinWalletJavaCardApplet" aid="0102030405060708090000"/>
 	  </cap>
 	</javacard>
+    
+	<!-- Trigger reinstall -->
+  	<exec executable="./scripts/reinstall"/>
   </target>
 
   <target name="clean"
