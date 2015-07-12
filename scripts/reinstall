@@ -1,0 +1,3 @@
+gpshell deleteApplet.txt
+rm ../bin/puk
+gpshell installApplet.txt
