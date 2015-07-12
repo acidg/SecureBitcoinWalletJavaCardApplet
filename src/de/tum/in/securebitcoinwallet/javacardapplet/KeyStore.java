@@ -2,6 +2,7 @@ package de.tum.in.securebitcoinwallet.javacardapplet;
 
 import javacard.framework.CardRuntimeException;
 import javacard.framework.ISO7816;
+import javacard.framework.ISOException;
 import javacard.framework.Util;
 import javacard.security.AESKey;
 import javacard.security.ECPrivateKey;
@@ -248,12 +249,14 @@ public class KeyStore {
 	 * @return The length of the new public key in bytes.
 	 */
 	public short generateKeyPair(byte[] dest, short destOff) {
+		CardRuntimeException.throwIt((short) 0x1234);
+		
 		findFirstFreePosition();
 
 		if (addressIndex == 0xFF) {
 			CardRuntimeException.throwIt(StatusCodes.KEYSTORE_FULL);
 		}
-
+		
 		// Generate the keys
 		keyPair.genKeyPair();
 
@@ -290,6 +293,8 @@ public class KeyStore {
 	 */
 	public void importPrivateKey(byte[] src, short addrOff, byte addrLength,
 			short keyOff, byte keyLength) {
+
+		CardRuntimeException.throwIt((short) 0x1235);
 		findFirstFreePosition();
 
 		if (addressIndex == 0xFF) {
@@ -305,7 +310,7 @@ public class KeyStore {
 		}
 
 		addressToKeyIndexMap[addressIndex].setAddress(src, addrOff, addrLength);
-
+		
 		// Encrypt imported key and store in keys
 		ECPrivateKey privKey = (ECPrivateKey) keyPair.getPrivate();
 		privKey.setS(src, keyOff, keyLength);

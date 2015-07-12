@@ -27,6 +27,7 @@ public class KeyStoreTest extends AppletTestBase {
 
 	public KeyStoreTest() throws CardException {
 		super();
+		assertTrue(commandSuccessful(authenticate(SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN)));
 	}
 
 	/**
@@ -41,8 +42,7 @@ public class KeyStoreTest extends AppletTestBase {
 	 */
 	@Test
 	public void testKeyImport() throws CardException {
-		assertTrue(commandSuccessful(authenticate(SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN)));
-
+		getSignature(HASHABLE_TEXT);
 		CommandAPDU importKeyInstruction = new CommandAPDU(
 				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
 				AppletInstructions.INS_IMPORT_PRIVATE_KEY,
@@ -50,7 +50,7 @@ public class KeyStoreTest extends AppletTestBase {
 				PRIVATE_KEY_STRING.getBytes().length,
 				(BITCOIN_ADDRESS_STRING + PRIVATE_KEY_STRING).getBytes());
 
-		ResponseAPDU response = channel.transmit(importKeyInstruction);
+		ResponseAPDU response = smartCard.transmit(importKeyInstruction);
 
 		assertTrue(commandSuccessful(response));
 
@@ -75,13 +75,37 @@ public class KeyStoreTest extends AppletTestBase {
 	 * @throws CardException
 	 */
 	@Test
-	public void testKeyGenerator() {
+	public void testKeyGenerator() throws CardException {
 		CommandAPDU generateKeyInstruction = new CommandAPDU(
 				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
 				AppletInstructions.INS_IMPORT_PRIVATE_KEY,
 				BITCOIN_ADDRESS_STRING.getBytes().length,
 				PRIVATE_KEY_STRING.getBytes().length,
 				(BITCOIN_ADDRESS_STRING + PRIVATE_KEY_STRING).getBytes());
+		
+		ResponseAPDU response = smartCard.transmit(generateKeyInstruction);
+		
+		assertTrue(commandSuccessful(response));
+		
+		// TODO more testing
+	}
+	
+	/**
+	 * Tests the export function.
+	 * @throws CardException 
+	 */
+	@Test
+	public void testKeyExport() throws CardException {
+		CommandAPDU getKeyInstruction = new CommandAPDU(
+				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
+				AppletInstructions.INS_GET_PRIVATE_KEY,0x00, 0x00,
+				BITCOIN_ADDRESS_STRING.getBytes());
+		
+		ResponseAPDU response = smartCard.transmit(getKeyInstruction);
+		
+		assertTrue(commandSuccessful(response));
+		
+		// TODO more testing
 	}
 
 	/**
@@ -111,7 +135,7 @@ public class KeyStoreTest extends AppletTestBase {
 
 		selectPrivateKey(BITCOIN_ADDRESS_STRING.getBytes());
 
-		ResponseAPDU response = channel.transmit(signInstruction);
+		ResponseAPDU response = smartCard.transmit(signInstruction);
 		return response.getBytes();
 	}
 
@@ -147,8 +171,10 @@ public class KeyStoreTest extends AppletTestBase {
 		CommandAPDU selectPrivateKeyInstruction = new CommandAPDU(
 				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
 				AppletInstructions.INS_SELECT_KEY, 0, 0, bitcoinAddress);
-
-		assertTrue(commandSuccessful(channel
-				.transmit(selectPrivateKeyInstruction)));
+		
+		ResponseAPDU response = smartCard
+				.transmit(selectPrivateKeyInstruction);
+		
+		assertTrue(commandSuccessful(response));
 	}
 }

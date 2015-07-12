@@ -43,7 +43,7 @@ public class PINTest extends AppletTestBase {
 				AppletInstructions.INS_AUTHENTICATE, 0, 0,
 				SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN);
 
-		ResponseAPDU response = channel.transmit(validateCommand);
+		ResponseAPDU response = smartCard.transmit(validateCommand);
 
 		assertTrue(commandSuccessful(response));
 
@@ -61,7 +61,7 @@ public class PINTest extends AppletTestBase {
 	public void testFaultyPINValidation()
 			throws ArrayIndexOutOfBoundsException, NullPointerException,
 			CardException {
-		ResponseAPDU response = channel.transmit(FAULTY_VALIDATE_INSTRUCTION);
+		ResponseAPDU response = smartCard.transmit(FAULTY_VALIDATE_INSTRUCTION);
 		
 		assertEquals(StatusCodes.SW_AUTH_FAILED, (short) response.getSW());
 
@@ -93,16 +93,16 @@ public class PINTest extends AppletTestBase {
 				AppletInstructions.INS_AUTHENTICATE, 0, 0, newPin);
 
 		// Change PIN to 111111
-		ResponseAPDU response = channel.transmit(toNewPINChangeCommand);
+		ResponseAPDU response = smartCard.transmit(toNewPINChangeCommand);
 		assertTrue(commandSuccessful(response));
 
 		// Check PIN
-		response = channel.transmit(validateNewPINCommand);
+		response = smartCard.transmit(validateNewPINCommand);
 		assertTrue(commandSuccessful(response));
 		assertTrue(checkPINValidated());
 
 		// Revert to default PIN 1234
-		response = channel.transmit(toOldPINChangeCommand);
+		response = smartCard.transmit(toOldPINChangeCommand);
 		assertTrue(commandSuccessful(response));
 
 		// Check old PIN
@@ -122,7 +122,7 @@ public class PINTest extends AppletTestBase {
 		// block the card by attempting authorization with a wrong pin several
 		// times
 		do {
-			response = channel.transmit(FAULTY_VALIDATE_INSTRUCTION);
+			response = smartCard.transmit(FAULTY_VALIDATE_INSTRUCTION);
 		} while ((short) response.getSW() == StatusCodes.SW_AUTH_FAILED);
 
 		assertEquals(StatusCodes.SW_CARD_LOCKED, (short) response.getSW());
@@ -136,7 +136,7 @@ public class PINTest extends AppletTestBase {
 				TestUtils.concatenate(puk,
 						SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN));
 
-		assertTrue(commandSuccessful(channel.transmit(unlockInstruction)));
+		assertTrue(commandSuccessful(smartCard.transmit(unlockInstruction)));
 
 		testCorrectPINValidation();
 	}
@@ -152,7 +152,7 @@ public class PINTest extends AppletTestBase {
 				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
 				AppletInstructions.INS_PIN_VALIDATED, 0, 0);
 
-		ResponseAPDU response = channel.transmit(isValidatedCommand);
+		ResponseAPDU response = smartCard.transmit(isValidatedCommand);
 
 		assertTrue(commandSuccessful(response));
 

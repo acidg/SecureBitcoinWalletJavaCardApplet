@@ -115,7 +115,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 		pin.update(DEFAULT_PIN, (byte) 0, (byte) DEFAULT_PIN.length);
 
 		keyStore = new KeyStore(STORE_SIZE, ADDRESS_SIZE);
-
+		
 		sha256TransactionHash = new byte[32];
 
 		register();
@@ -138,8 +138,8 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * 
 	 * @param apdu The APDU command to process.
 	 */
-	@Override
 	public void process(APDU apdu) throws ISOException {
+		
 		byte[] buffer = apdu.getBuffer();
 
 		if (selectingApplet()) {
@@ -150,7 +150,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 		if (buffer[ISO7816.OFFSET_CLA] != AppletInstructions.SECURE_BITCOIN_WALLET_CLA) {
 			ISOException.throwIt(ISO7816.SW_CLA_NOT_SUPPORTED);
 		}
-
+		
 		if (buffer[ISO7816.OFFSET_INS] == AppletInstructions.INS_SETUP) {
 			setup(apdu, buffer);
 			return;
@@ -261,7 +261,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * Authenticates the user via the pin.
 	 * 
 	 * <pre>
-	 * INS:	0x04
+	 * INS:	0x06
 	 * P1:	0x00
 	 * P2:	0x00
 	 * Lc:	PIN length in bytes
@@ -293,7 +293,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * Changes the PIN. The User has to be authenticated.
 	 * 
 	 * <pre>
-	 * INS:	0x06
+	 * INS:	0x08
 	 * P1: 	0x00
 	 * P2: 	0x00 
 	 * Lc: 	length of PIN
@@ -323,7 +323,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * Checks whether the PIN is validated.
 	 * 
 	 * <pre>
-	 * INS:	0x08
+	 * INS:	0x0A
 	 * P1:	0x00 
 	 * P2:	0x00
 	 * 
@@ -341,7 +341,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * transaction.
 	 * 
 	 * <pre>
-	 * INS:	0xAA 
+	 * INS:	0x0C 
 	 * P1:	0x00 
 	 * P2:	0x00 
 	 * Lc:	length of address in bytes
@@ -366,7 +366,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * private key of the previously selected key, see: {@link #selectKey()}.
 	 * 
 	 * <pre>
-	 * INS:	0xAC
+	 * INS:	0x0E
 	 * P1:	0x00
 	 * P2:	0x00
 	 * Lc:	Length of hash, should be 32 bytes.
@@ -406,7 +406,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * inside the keystore. The public key is returned.
 	 *
 	 * <pre>
-	 * INS:	0xAD
+	 * INS:	0x10
 	 * P1:	0x00
 	 * P2:	0x00
 	 *
@@ -431,7 +431,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * Stores the given private key encrypted in the EEPROM.
 	 * 
 	 * <pre>
-	 * INS:	0xD8
+	 * INS:	0x12
 	 * P1:	length of address in bytes
 	 * P2:	length of private key in bytes
 	 * Lc:	total length
@@ -465,7 +465,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * Gets the encrypted private key.
 	 * 
 	 * <pre>
-	 * INS:	0xB0
+	 * INS:	0x14
 	 * P1:	0x00
 	 * P2:	0x00
 	 * Lc:	Length of Bitcoin address
@@ -496,7 +496,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * Deletes the private key for the given address.
 	 * 
 	 * <pre>
-	 * INS:	0xE4
+	 * INS:	0x16
 	 * P1:	0x00
 	 * P2:	0x00
 	 * Lc:	Length of address
@@ -521,21 +521,19 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	}
 
 	/**
-	 * Returns the remaining memory in bytes.
+	 * Returns the remaining memory in keys.
 	 * 
 	 * <pre>
-	 * INS:	0x28
+	 * INS:	0x18
 	 * P1:	0x00
 	 * P2:	0x00
 	 * Lc:	0x00
 	 * 
-	 * Return: The remaining memory in bytes.
+	 * Return: The remaining memory in keys.
 	 * </pre>
 	 */
 	private void getRemainingMemory(APDU apdu, byte[] buffer) {
-		short remainingMemory = JCSystem
-				.getAvailableMemory(JCSystem.MEMORY_TYPE_PERSISTENT);
-
+		short remainingMemory = keyStore.getNumberOfKeysRemaining();
 		buffer[0] = (byte) (remainingMemory >> 8);
 		buffer[1] = (byte) (remainingMemory & 0xFF);
 
