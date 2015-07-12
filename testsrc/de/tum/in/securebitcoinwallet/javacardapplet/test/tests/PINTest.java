@@ -21,6 +21,8 @@ import de.tum.in.securebitcoinwallet.javacardapplet.test.TestUtils;
  * @author Benedikt Schlagberger
  */
 public class PINTest extends AppletTestBase {
+	private static final byte[] WRONG_PIN = { 4, 3, 2, 1 };
+
 	public PINTest() throws CardException {
 		super();
 	}
@@ -40,9 +42,7 @@ public class PINTest extends AppletTestBase {
 	 */
 	@Test
 	public void testFaultyPINValidation() throws CardException {
-		byte[] wrongPIN = { 4, 3, 2, 1 };
-
-		assertFalse(authenticate(wrongPIN));
+		assertFalse(authenticate(WRONG_PIN));
 	}
 
 	/**
@@ -52,6 +52,8 @@ public class PINTest extends AppletTestBase {
 	public void testPINchange() throws CardException {
 		byte[] newPin = { 0x01, 0x01, 0x01, 0x01, 0x01, 0x01 };
 
+		assertTrue(authenticate(SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN));
+		
 		changePin(newPin);
 
 		assertFalse(authenticate(SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN));
@@ -76,12 +78,12 @@ public class PINTest extends AppletTestBase {
 		CommandAPDU faultyAuthenticateInstruction = new CommandAPDU(
 				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
 				AppletInstructions.INS_AUTHENTICATE, 0, 0,
-				SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN);
+				WRONG_PIN);
 		
 		CommandAPDU unlockInstruction = new CommandAPDU(
 				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
 				AppletInstructions.INS_UNLOCK,
-				SecureBitcoinWalletJavaCardApplet.PUK_SIZE,
+				puk.length,
 				SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN.length,
 				TestUtils.concatenate(puk,
 						SecureBitcoinWalletJavaCardApplet.DEFAULT_PIN));

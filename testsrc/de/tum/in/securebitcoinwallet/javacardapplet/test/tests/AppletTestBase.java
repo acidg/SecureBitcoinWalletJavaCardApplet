@@ -24,7 +24,7 @@ import de.tum.in.securebitcoinwallet.javacardapplet.test.JavaCardSimulator;
  */
 public abstract class AppletTestBase {
 
-	private boolean USE_SIMULATOR = false;
+	private static boolean USE_SIMULATOR = false;
 
 	/**
 	 * The AID of the Issuer Security Domain.
@@ -104,12 +104,13 @@ public abstract class AppletTestBase {
 		
 		boolean result = false;
 		
-		switch (response.getSW()) {
+		switch ((short) response.getSW()) {
 		case StatusCodes.SW_AUTH_FAILED:
 		case StatusCodes.SW_CARD_LOCKED:
 			break;
 		case ISO7816.SW_NO_ERROR:
 			result = true;
+			break;
 		default:
 			throw new RuntimeException("Unknown StatusCode: " + getHexString(response.getBytes()));
 		}
