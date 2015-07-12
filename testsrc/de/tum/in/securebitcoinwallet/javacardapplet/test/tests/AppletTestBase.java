@@ -16,6 +16,7 @@ import de.tum.in.securebitcoinwallet.javacardapplet.StatusCodes;
 import de.tum.in.securebitcoinwallet.javacardapplet.test.JavaCard;
 import de.tum.in.securebitcoinwallet.javacardapplet.test.JavaCardHardware;
 import de.tum.in.securebitcoinwallet.javacardapplet.test.JavaCardSimulator;
+import de.tum.in.securebitcoinwallet.javacardapplet.test.util.TestUtils;
 
 /**
  * Base class for Java Card applet tests.
@@ -78,17 +79,6 @@ public abstract class AppletTestBase {
 	}
 
 	/**
-	 * Creates a String representing the given byte array in HEY notation.
-	 */
-	public static String getHexString(byte[] data) {
-		StringBuilder builder = new StringBuilder();
-		for (byte b : data) {
-			builder.append(String.format("%02X ", b) + " ");
-		}
-		return builder.toString();
-	}
-
-	/**
 	 * Authenticate at the smartcard with the given PIN.
 	 *
 	 * @param pin The PIN to authenticate with
@@ -105,14 +95,14 @@ public abstract class AppletTestBase {
 		boolean result = false;
 		
 		switch ((short) response.getSW()) {
-		case StatusCodes.SW_AUTH_FAILED:
-		case StatusCodes.SW_CARD_LOCKED:
+		case StatusCodes.AUTH_FAILED:
+		case StatusCodes.CARD_LOCKED:
 			break;
 		case ISO7816.SW_NO_ERROR:
 			result = true;
 			break;
 		default:
-			throw new RuntimeException("Unknown StatusCode: " + getHexString(response.getBytes()));
+			throw new RuntimeException("Unknown StatusCode: " + TestUtils.getHexString(response.getBytes()));
 		}
 		
 		assertEquals(checkPINValidated(), result);

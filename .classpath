@@ -11,7 +11,7 @@
 			<accessrule kind="accessible" pattern="javax/javacard/**"/>
 		</accessrules>
 	</classpathentry>
-	<classpathentry kind="lib" path="lib/api_classic.jar"/>
+	<classpathentry kind="lib" path="lib/api_classic.jar" sourcepath="/opt/oracle/jcdk3.0.5/preprocessed_src"/>
 	<classpathentry kind="lib" path="lib/api_classic_annotations.jar"/>
 	<classpathentry kind="lib" path="lib/jcardsim-3.0.4.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.junit.JUNIT_CONTAINER/4"/>

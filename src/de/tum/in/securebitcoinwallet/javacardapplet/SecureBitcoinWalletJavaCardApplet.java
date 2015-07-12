@@ -55,10 +55,9 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	public final static byte STORE_SIZE = (byte) 16;
 
 	/**
-	 * Maximum size of an address in bytes. 39 alpha numeric characters (e.g.
-	 * ascii)
+	 * Maximum size of an address in bytes. 35 alpha numeric characters.
 	 */
-	public final static byte ADDRESS_SIZE = (byte) 0x24;
+	public final static byte ADDRESS_SIZE = (byte) 35;
 
 	/**
 	 * Sign mode initialize.
@@ -114,7 +113,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 		pin.update(DEFAULT_PIN, (byte) 0, (byte) DEFAULT_PIN.length);
 
 		keyStore = new KeyStore(STORE_SIZE, ADDRESS_SIZE);
-		
+
 		sha256TransactionHash = new byte[32];
 
 		register();
@@ -138,7 +137,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * @param apdu The APDU command to process.
 	 */
 	public void process(APDU apdu) throws ISOException {
-		
+
 		byte[] buffer = apdu.getBuffer();
 
 		if (selectingApplet()) {
@@ -147,16 +146,16 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 
 		// Verify the CLA byte
 		if (buffer[ISO7816.OFFSET_CLA] != AppletInstructions.SECURE_BITCOIN_WALLET_CLA) {
-			ISOException.throwIt(ISO7816.SW_CLA_NOT_SUPPORTED);
+			ISOException.throwIt(StatusCodes.CLA_NOT_SUPPORTED);
 		}
-		
+
 		if (buffer[ISO7816.OFFSET_INS] == AppletInstructions.INS_SETUP) {
 			setup(apdu, buffer);
 			return;
 		}
 
 		if (!setupDone) {
-			ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+			ISOException.throwIt(StatusCodes.CONDITIONS_NOT_SATISFIED);
 		}
 
 		// Check the INS byte
@@ -195,7 +194,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 			getRemainingMemory(apdu, buffer);
 			break;
 		default:
-			ISOException.throwIt(ISO7816.SW_INS_NOT_SUPPORTED);
+			ISOException.throwIt(StatusCodes.INS_NOT_SUPPORTED);
 		}
 	}
 
@@ -212,7 +211,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 */
 	private void setup(APDU apdu, byte[] buffer) {
 		if (setupDone) {
-			ISOException.throwIt(ISO7816.SW_COMMAND_NOT_ALLOWED);
+			ISOException.throwIt(StatusCodes.COMMAND_NOT_ALLOWED);
 		}
 
 		RandomData.getInstance(RandomData.ALG_SECURE_RANDOM).generateData(
@@ -239,15 +238,15 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 		if (buffer[ISO7816.OFFSET_P1] != PUK_SIZE
 				|| buffer[ISO7816.OFFSET_P2] < PIN_MINIMUM_SIZE
 				|| buffer[ISO7816.OFFSET_P2] > PIN_MAXIMUM_SIZE) {
-			ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
+			ISOException.throwIt(StatusCodes.INCORRECT_P1P2);
 		}
 
 		if (apdu.setIncomingAndReceive() == 0) {
-			ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+			ISOException.throwIt(StatusCodes.DATA_INVALID);
 		}
 
 		if (!puk.check(buffer, ISO7816.OFFSET_CDATA, buffer[ISO7816.OFFSET_P1])) {
-			ISOException.throwIt(StatusCodes.SW_AUTH_FAILED);
+			ISOException.throwIt(StatusCodes.AUTH_FAILED);
 		} else {
 			pin.resetAndUnblock();
 			puk.reset();
@@ -272,19 +271,19 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 
 		if (buffer[ISO7816.OFFSET_P1] != 0x00
 				|| buffer[ISO7816.OFFSET_P1] != 0x00) {
-			ISOException.throwIt(ISO7816.SW_WRONG_P1P2);
+			ISOException.throwIt(StatusCodes.INCORRECT_P1P2);
 		}
 
 		if (pin.getTriesRemaining() == (byte) 0x00) {
-			ISOException.throwIt(StatusCodes.SW_CARD_LOCKED);
+			ISOException.throwIt(StatusCodes.CARD_LOCKED);
 		}
 
 		if (apdu.setIncomingAndReceive() == 0) {
-			ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+			ISOException.throwIt(StatusCodes.DATA_INVALID);
 		}
 
 		if (!pin.check(buffer, ISO7816.OFFSET_CDATA, buffer[ISO7816.OFFSET_LC])) {
-			ISOException.throwIt(StatusCodes.SW_AUTH_FAILED);
+			ISOException.throwIt(StatusCodes.AUTH_FAILED);
 		}
 	}
 
@@ -301,17 +300,17 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 */
 	private void changePin(APDU apdu, byte[] buffer) {
 		if (!pin.isValidated()) {
-			ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+			ISOException.throwIt(StatusCodes.PIN_VERIFICATION_REQUIRED);
 		}
 
 		byte pin_size = buffer[ISO7816.OFFSET_LC];
 
 		if (pin_size < PIN_MINIMUM_SIZE || pin_size > PIN_MAXIMUM_SIZE) {
-			ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+			ISOException.throwIt(StatusCodes.WRONG_LENGTH);
 		}
 
 		if (apdu.setIncomingAndReceive() == 0) {
-			ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+			ISOException.throwIt(StatusCodes.DATA_INVALID);
 		}
 
 		pin.update(buffer, (short) (ISO7816.OFFSET_CDATA), pin_size);
@@ -349,11 +348,11 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 */
 	private void selectKey(APDU apdu, byte[] buffer) {
 		if (!pin.isValidated()) {
-			ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+			ISOException.throwIt(StatusCodes.PIN_VERIFICATION_REQUIRED);
 		}
 
 		if (apdu.setIncomingAndReceive() == 0) {
-			ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+			ISOException.throwIt(StatusCodes.DATA_INVALID);
 		}
 
 		keyStore.selectKeyForSignature(buffer, ISO7816.OFFSET_CDATA,
@@ -376,20 +375,20 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 */
 	private void signSHA256Hash(APDU apdu, byte[] buffer) {
 		if (!pin.isValidated()) {
-			ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+			ISOException.throwIt(StatusCodes.PIN_VERIFICATION_REQUIRED);
 		}
 
 		if (buffer[ISO7816.OFFSET_P1] != 0x00
 				|| buffer[ISO7816.OFFSET_P2] != 0x00) {
-			ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
+			ISOException.throwIt(StatusCodes.INCORRECT_P1P2);
 		}
 
 		if ((buffer[ISO7816.OFFSET_LC] & 0xFF) != 0x20) {
-			ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+			ISOException.throwIt(StatusCodes.WRONG_LENGTH);
 		}
 
 		if (apdu.setIncomingAndReceive() != (short) sha256TransactionHash.length) {
-			ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+			ISOException.throwIt(StatusCodes.DATA_INVALID);
 		}
 
 		Util.arrayCopy(buffer, ISO7816.OFFSET_CDATA, sha256TransactionHash,
@@ -405,21 +404,21 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * inside the keystore. The public key is returned.
 	 *
 	 * <pre>
-	 * INS:	0x10
+	 * INS:	0x20
 	 * P1:	0x00
 	 * P2:	0x00
-	 *
+	 * 
 	 * Return: The generated public key
 	 * </pre>
 	 */
 	private void generateKey(APDU apdu, byte[] buffer) {
 		if (!pin.isValidated()) {
-			ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+			ISOException.throwIt(StatusCodes.PIN_VERIFICATION_REQUIRED);
 		}
 
-		if (buffer[ISO7816.OFFSET_P1] != 0x00
-				|| buffer[ISO7816.OFFSET_P2] != 0x00) {
-			ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
+		if ((buffer[ISO7816.OFFSET_P1] & 0xFF) != 0x00
+				|| (buffer[ISO7816.OFFSET_P2] & 0xFF) != 0x00) {
+			ISOException.throwIt(StatusCodes.INCORRECT_P1P2);
 		}
 
 		apdu.setOutgoingAndSend((short) 0,
@@ -430,7 +429,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * Stores the given private key encrypted in the EEPROM.
 	 * 
 	 * <pre>
-	 * INS:	0x12
+	 * INS:	0x22
 	 * P1:	length of address in bytes
 	 * P2:	length of private key in bytes
 	 * Lc:	total length
@@ -443,28 +442,32 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 */
 	private void importPrivateKey(APDU apdu, byte[] buffer) {
 		if (!pin.isValidated()) {
-			ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+			ISOException.throwIt(StatusCodes.PIN_VERIFICATION_REQUIRED);
 		}
 
 		if (((short) (buffer[ISO7816.OFFSET_P1] & 0xFF)) > ((short) ADDRESS_SIZE & 0xFF)) {
-			ISOException.throwIt(ISO7816.SW_INCORRECT_P1P2);
+			ISOException.throwIt(StatusCodes.WRONG_ADDRESS_LENGTH);
+		}
+		
+		if (buffer[ISO7816.OFFSET_P2] != (byte) 0x20) {
+			ISOException.throwIt(StatusCodes.WRONG_PRIVATE_KEY_LENGTH);
 		}
 
 		if (apdu.setIncomingAndReceive() == 0) {
-			ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+			ISOException.throwIt(StatusCodes.DATA_INVALID);
 		}
 
-		keyStore.importPrivateKey(buffer, ISO7816.OFFSET_CDATA,
-				buffer[ISO7816.OFFSET_P1],
+		keyStore.importPrivateKey(buffer, (short) ISO7816.OFFSET_CDATA,
+				(short) buffer[ISO7816.OFFSET_P1],
 				(short) (ISO7816.OFFSET_CDATA + buffer[ISO7816.OFFSET_P1]),
-				buffer[ISO7816.OFFSET_P2]);
+				(short) buffer[ISO7816.OFFSET_P2]);
 	}
 
 	/**
 	 * Gets the encrypted private key.
 	 * 
 	 * <pre>
-	 * INS:	0x14
+	 * INS:	0x24
 	 * P1:	0x00
 	 * P2:	0x00
 	 * Lc:	Length of Bitcoin address
@@ -475,19 +478,19 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 */
 	private void getPrivateKey(APDU apdu, byte[] buffer) {
 		if (!pin.isValidated()) {
-			ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+			ISOException.throwIt(StatusCodes.PIN_VERIFICATION_REQUIRED);
 		}
 
 		if (apdu.setIncomingAndReceive() == 0) {
-			ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+			ISOException.throwIt(StatusCodes.DATA_INVALID);
 		}
 
-		if (((short) buffer[ISO7816.OFFSET_LC] & 0xFF) > ((short) ADDRESS_SIZE & 0xFF)) {
-			ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+		if (((short) (buffer[ISO7816.OFFSET_LC] & 0xFF)) > ((short) ADDRESS_SIZE & 0xFF)) {
+			ISOException.throwIt(StatusCodes.WRONG_ADDRESS_LENGTH);
 		}
 
 		apdu.setOutgoingAndSend((short) 0, keyStore.getEncryptedPrivateKey(
-				buffer, ISO7816.OFFSET_CDATA, buffer[ISO7816.OFFSET_P1],
+				buffer, (short) ISO7816.OFFSET_CDATA, (short) buffer[ISO7816.OFFSET_LC],
 				buffer, (short) 0));
 	}
 
@@ -495,7 +498,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * Deletes the private key for the given address.
 	 * 
 	 * <pre>
-	 * INS:	0x16
+	 * INS:	0x26
 	 * P1:	0x00
 	 * P2:	0x00
 	 * Lc:	Length of address
@@ -504,15 +507,11 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 */
 	private void deletePrivateKey(APDU apdu, byte[] buffer) {
 		if (!pin.isValidated()) {
-			ISOException.throwIt(ISO7816.SW_SECURITY_STATUS_NOT_SATISFIED);
+			ISOException.throwIt(StatusCodes.PIN_VERIFICATION_REQUIRED);
 		}
 
 		if (apdu.setIncomingAndReceive() == 0) {
-			ISOException.throwIt(ISO7816.SW_DATA_INVALID);
-		}
-
-		if (((short) buffer[ISO7816.OFFSET_LC] & 0xFF) > ((short) ADDRESS_SIZE & 0xFF)) {
-			ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+			ISOException.throwIt(StatusCodes.DATA_INVALID);
 		}
 
 		keyStore.deletePrivateKey(buffer, ISO7816.OFFSET_CDATA,
@@ -523,7 +522,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * Returns the remaining memory in keys.
 	 * 
 	 * <pre>
-	 * INS:	0x18
+	 * INS:	0x28
 	 * P1:	0x00
 	 * P2:	0x00
 	 * Lc:	0x00
@@ -532,9 +531,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * </pre>
 	 */
 	private void getRemainingMemory(APDU apdu, byte[] buffer) {
-		short remainingMemory = keyStore.getNumberOfKeysRemaining();
-		buffer[0] = (byte) (remainingMemory >> 8);
-		buffer[1] = (byte) (remainingMemory & 0xFF);
+		Util.setShort(buffer, (short) 0, keyStore.getNumberOfKeysRemaining());
 
 		apdu.setOutgoingAndSend((short) 0, (short) 2);
 	}

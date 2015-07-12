@@ -1,6 +1,7 @@
 package de.tum.in.securebitcoinwallet.javacardapplet;
 
 import javacard.framework.CardRuntimeException;
+import javacard.framework.ISOException;
 import javacard.framework.Util;
 
 /**
@@ -30,7 +31,7 @@ public class BitcoinAddress {
 	 */
 	public BitcoinAddress(short size) {
 		if (size > MAX_ADDRESS_LENGTH) {
-			CardRuntimeException.throwIt(StatusCodes.WRONG_ADDRESS_LENGTH);
+			ISOException.throwIt(StatusCodes.WRONG_ADDRESS_LENGTH);
 		}
 
 		addressBytes = new byte[size];
@@ -45,8 +46,8 @@ public class BitcoinAddress {
 	 * @param addrLength The length of the address (may not exceed 255 bytes).
 	 */
 	public void setAddress(byte[] src, short addrOff, short addrLength) {
-		if ((short) (0xFF & addrLength) > (short) addressBytes.length) {
-			CardRuntimeException.throwIt(StatusCodes.WRONG_ADDRESS_LENGTH);
+		if (addrLength > (short) addressBytes.length) {
+			ISOException.throwIt(StatusCodes.WRONG_ADDRESS_LENGTH);
 		}
 
 		size = addrLength;
@@ -71,7 +72,7 @@ public class BitcoinAddress {
 
 	/**
 	 * Checks whether the given address equals this BitcoinAddress.
-	 * 
+	 *  
 	 * @param src The array, in which the address can be found
 	 * @param addrOff The offset of the address inside the source array
 	 * @param addrLength The length of the address

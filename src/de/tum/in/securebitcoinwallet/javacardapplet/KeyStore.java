@@ -1,9 +1,10 @@
 package de.tum.in.securebitcoinwallet.javacardapplet;
 
-import javacard.framework.CardRuntimeException;
 import javacard.framework.ISO7816;
+import javacard.framework.ISOException;
 import javacard.framework.Util;
 import javacard.security.AESKey;
+import javacard.security.CryptoException;
 import javacard.security.ECPrivateKey;
 import javacard.security.ECPublicKey;
 import javacard.security.KeyBuilder;
@@ -40,7 +41,7 @@ public class KeyStore {
 	/**
 	 * The maximum length of a private key in bytes.
 	 */
-	private static final short MAX_PRIVATE_KEY_SIZE = 63;
+	private static final short PRIVATE_KEY_SIZE = 32;
 
 	/**
 	 * The store for the private keys. If a key is null, the slot is free and
@@ -79,7 +80,7 @@ public class KeyStore {
 	/**
 	 * Index of the key inside the {@link keys} array.
 	 */
-	private short addressIndex;
+	private byte addressIndex;
 
 	/**
 	 * Used to generate a new keypair and sign transactions.
@@ -105,7 +106,7 @@ public class KeyStore {
 	 * Buffer used in {@link #encryptPrivateKey(ECPrivateKey, byte[], short)}
 	 * and {@link #decryptPrivateKey(EncryptedPrivateKey, byte[], short)}.
 	 */
-	private byte[] encryptedBuffer;
+	private byte[] encryptionBuffer;
 
 	/**
 	 * Buffer for RIPEMD160 hashing and base58 encoding.
@@ -127,15 +128,15 @@ public class KeyStore {
 		addressIndex = 0;
 
 		if (storeSize >= 0xFF) {
-			storeSize = 0xFE;
+			ISOException.throwIt(StatusCodes.WRONG_LENGTH);
 		}
 
 		if (addressSize >= 0xFF) {
-			addressSize = 0xFE;
+			ISOException.throwIt(StatusCodes.WRONG_LENGTH);
 		}
 
 		keyBuffer = new byte[256];
-		encryptedBuffer = new byte[64];
+		encryptionBuffer = new byte[64];
 		hashBuffer = new byte[256];
 
 		RandomData.getInstance(RandomData.ALG_SECURE_RANDOM).generateData(
@@ -182,7 +183,7 @@ public class KeyStore {
 
 		// Allocate memory for keys
 		for (short i = 0; i < keys.length; i++) {
-			keys[i] = new EncryptedPrivateKey();
+			keys[i] = new EncryptedPrivateKey(PRIVATE_KEY_SIZE);
 		}
 	}
 
@@ -201,7 +202,7 @@ public class KeyStore {
 		selectedAddress = addressIndex;
 
 		if (addressIndex == 0xFF) {
-			CardRuntimeException.throwIt(StatusCodes.KEY_NOT_FOUND);
+			ISOException.throwIt(StatusCodes.KEY_NOT_FOUND);
 		}
 	}
 
@@ -222,7 +223,7 @@ public class KeyStore {
 			byte[] dest, short destOff) {
 
 		if (selectedAddress == (short) 0xFF) {
-			CardRuntimeException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+			ISOException.throwIt(StatusCodes.CONDITIONS_NOT_SATISFIED);
 		}
 
 		short keyLength = decryptPrivateKey(keys[selectedAddress], keyBuffer,
@@ -250,19 +251,21 @@ public class KeyStore {
 	public short generateKeyPair(byte[] dest, short destOff) {
 		findFirstFreePosition();
 
-		if (addressIndex == 0xFF) {
-			CardRuntimeException.throwIt(StatusCodes.KEYSTORE_FULL);
+		if ((addressIndex & 0xFF) == 0xFF) {
+			ISOException.throwIt(StatusCodes.KEYSTORE_FULL);
 		}
-		
+
 		// Generate the keys
 		keyPair.genKeyPair();
 
 		ECPublicKey pubKey = (ECPublicKey) keyPair.getPublic();
-
+		
 		// Calculate the key's Bitcoin address, the address is stored in
 		// keyBuffer
 		short addressLength = calculateBitcoinAddress(pubKey);
-
+		
+		Util.setShort(dest, (short) 2, addressLength);
+		
 		// Store address in the addressToKeyIndexMap
 		addressToKeyIndexMap[addressIndex].setAddress(keyBuffer, (short) 0,
 				addressLength);
@@ -288,27 +291,35 @@ public class KeyStore {
 	 * @param keyOff Offset of the private key inside the byte array
 	 * @param keyLength Length of the private key
 	 */
-	public void importPrivateKey(byte[] src, short addrOff, byte addrLength,
-			short keyOff, byte keyLength) {
+	public void importPrivateKey(byte[] src, short addrOff, short addrLength,
+			short keyOff, short keyLength) {
+		calculateIndexForAddress(src, addrOff, addrLength);
+
+		if ((addressIndex & 0xFF) != 0xFF) {
+			ISOException.throwIt(StatusCodes.KEY_ALREADY_IN_STORE);
+		}
+
 		findFirstFreePosition();
 
-		if (addressIndex == 0xFF) {
-			CardRuntimeException.throwIt(StatusCodes.KEYSTORE_FULL);
+		if (addressIndex == (byte) 0xFF) {
+			ISOException.throwIt(StatusCodes.KEYSTORE_FULL);
 		}
 
-		if ((short) (addrLength & 0xFF) > BitcoinAddress.MAX_ADDRESS_LENGTH) {
-			CardRuntimeException.throwIt(StatusCodes.WRONG_ADDRESS_LENGTH);
-		}
+		validateBitcoinAddress(src, addrOff, addrLength);
 
-		if ((short) (keyLength & 0xFF) > MAX_PRIVATE_KEY_SIZE) {
-			CardRuntimeException.throwIt(StatusCodes.WRONG_PRIVATE_KEY_LENGTH);
+		if (keyLength != 32) {
+			ISOException.throwIt(StatusCodes.WRONG_PRIVATE_KEY_LENGTH);
 		}
 
 		addressToKeyIndexMap[addressIndex].setAddress(src, addrOff, addrLength);
-		
+
 		// Encrypt imported key and store in keys
 		ECPrivateKey privKey = (ECPrivateKey) keyPair.getPrivate();
-		privKey.setS(src, keyOff, keyLength);
+		try {
+			privKey.setS(src, keyOff, keyLength);
+		} catch (CryptoException e) {
+			Util.setShort(src, (short) 0, e.getReason());
+		}
 
 		keys[addressIndex].setKey(keyBuffer, (short) 0,
 				encryptPrivateKey(privKey, keyBuffer, (short) 0));
@@ -330,10 +341,12 @@ public class KeyStore {
 	public short getEncryptedPrivateKey(byte[] src, short addrOff,
 			short addrLength, byte[] dest, short destOff) {
 
+		validateBitcoinAddress(src, addrOff, addrLength);
+
 		calculateIndexForAddress(src, addrOff, addrLength);
 
 		if (addressIndex == 0xFF) {
-			CardRuntimeException.throwIt(StatusCodes.KEY_NOT_FOUND);
+			ISOException.throwIt(StatusCodes.KEY_NOT_FOUND);
 		}
 
 		return keys[addressIndex].getKey(dest, destOff);
@@ -348,11 +361,16 @@ public class KeyStore {
 	 * @param addrOff Offset for the address inside the byte array
 	 * @param addrLength Length of the address
 	 */
-	public void deletePrivateKey(byte[] src, short addrOff, short addrLength) {
+	public void deletePrivateKey(byte[] src, short addrOff, short addrLength)
+			throws ISOException {
+		validateBitcoinAddress(src, addrOff, (byte) addrLength);
+
 		calculateIndexForAddress(src, addrOff, addrLength);
-		if (addressIndex != 0xFF) {
+		if (addressIndex != (byte) 0xFF) {
 			addressToKeyIndexMap[addressIndex].delete();
 			keys[addressIndex].clear();
+		} else {
+			ISOException.throwIt(StatusCodes.KEY_NOT_FOUND);
 		}
 	}
 
@@ -398,16 +416,16 @@ public class KeyStore {
 	private void calculateIndexForAddress(byte[] src, short addrOff,
 			short addrLength) {
 
-		if ((addrLength & 0xFF) > 0xFF) {
-			CardRuntimeException.throwIt(StatusCodes.WRONG_ADDRESS_LENGTH);
-		}
+		addressIndex = 0;
 
-		for (addressIndex = 0; addressIndex < addressToKeyIndexMap.length; addressIndex++) {
+		while ((addressIndex & 0xFF) < addressToKeyIndexMap.length) {
 			if (addressToKeyIndexMap[addressIndex].equalsAddress(src, addrOff,
 					addrLength)) {
 				return;
 			}
+			addressIndex++;
 		}
+
 		addressIndex = (byte) 0xFF;
 	}
 
@@ -417,17 +435,19 @@ public class KeyStore {
 	 * set to 255 (0xFF).
 	 */
 	private void findFirstFreePosition() {
-		for (addressIndex = 0; addressIndex < keys.length; addressIndex++) {
+		addressIndex = 0;
+		while ((addressIndex & 0xFF) < keys.length) {
 			if (!keys[addressIndex].isInUse()) {
 				return;
 			}
+			addressIndex++;
 		}
 		addressIndex = (byte) 0xFF;
 	}
 
 	/**
 	 * Encrypts the given private key with the AES key of this store.</br>
-	 * Uses {@link #encryptedBuffer}.</br>
+	 * Uses {@link #encryptionBuffer}.</br>
 	 * If the length is too short to suit the 128bits block size, additional
 	 * random values are appended.
 	 * 
@@ -439,28 +459,21 @@ public class KeyStore {
 	 */
 	private short encryptPrivateKey(ECPrivateKey privateKey, byte[] dest,
 			short destOff) {
-		short keyLength = privateKey.getS(encryptedBuffer, (short) 1);
+		short keyLength = privateKey.getS(encryptionBuffer, (short) 0);
 
-		if (keyLength > MAX_PRIVATE_KEY_SIZE) {
-			CardRuntimeException.throwIt(StatusCodes.WRONG_PRIVATE_KEY_LENGTH);
+		if (keyLength != PRIVATE_KEY_SIZE) {
+			ISOException.throwIt(StatusCodes.WRONG_PRIVATE_KEY_LENGTH);
 		}
-		
-		encryptedBuffer[0] = (byte) keyLength;
-
-		// Fill remaining bytes with random data
-		RandomData.getInstance(RandomData.ALG_SECURE_RANDOM).generateData(
-				encryptedBuffer, (short) (keyLength + 1),
-				(short) (64 - keyLength - 1));
 
 		aesCipher.init(aesKey, Cipher.MODE_ENCRYPT);
 
-		return aesCipher.doFinal(encryptedBuffer, (short) 0, (short) 64, dest,
-				destOff);
+		return aesCipher.doFinal(encryptionBuffer, (short) 0, PRIVATE_KEY_SIZE,
+				dest, destOff);
 	}
 
 	/**
 	 * Decrypts the given private key with the AES key of this store.</br>
-	 * Uses {@link #encryptedBuffer}.
+	 * Uses {@link #encryptionBuffer}.
 	 * 
 	 * @param privateKey The private key to decrypt
 	 * @param dest The destination, where the decrypted key is put
@@ -470,16 +483,20 @@ public class KeyStore {
 	 */
 	private short decryptPrivateKey(EncryptedPrivateKey privateKey,
 			byte[] dest, short destOff) {
-		short keyLength = privateKey.getKey(encryptedBuffer, (short) 0);
+		short keyLength = privateKey.getKey(encryptionBuffer, (short) 0);
+
+		if (keyLength != PRIVATE_KEY_SIZE) {
+			ISOException.throwIt(StatusCodes.WRONG_PRIVATE_KEY_LENGTH);
+		}
 
 		aesCipher.init(aesKey, Cipher.MODE_DECRYPT);
-		aesCipher.doFinal(encryptedBuffer, (short) 0, keyLength,
-				encryptedBuffer, (short) 0);
+		aesCipher.doFinal(encryptionBuffer, (short) 0, keyLength,
+				encryptionBuffer, (short) 0);
 
-		Util.arrayCopy(encryptedBuffer, (short) 1, dest, destOff,
-				encryptedBuffer[0]);
+		Util.arrayCopy(encryptionBuffer, (short) 0, dest, destOff,
+				PRIVATE_KEY_SIZE);
 
-		return (short) encryptedBuffer[0];
+		return keyLength;
 	}
 
 	/**
@@ -505,13 +522,15 @@ public class KeyStore {
 		short keyLength = pubKey.getW(keyBuffer, (short) 0);
 
 		// Calculate sha256 hash of public key
-		short sha256Length = sha256Digest.doFinal(keyBuffer, (short) 0,
-				keyLength, keyBuffer, (short) 0);
+		short sha256Length;
+		sha256Length = sha256Digest.doFinal(keyBuffer, (short) 0, keyLength,
+				keyBuffer, (short) 0);
 
 		// Calculate ripemd160 hash of sha256 hash
-		Ripemd160.hash32(keyBuffer, (short) 0, keyBuffer, (short) 0, hashBuffer, (short) 0);
-		
-		short ripemd160Length = 32;
+		Ripemd160.hash32(keyBuffer, (short) 0, keyBuffer, (short) 1,
+				hashBuffer, (short) 0);
+
+		short ripemd160Length = 20;
 
 		// Add version byte (0x00 for Main Network)
 		keyBuffer[0] = (byte) 0x00;
@@ -530,5 +549,21 @@ public class KeyStore {
 		return Base58.encode(keyBuffer, (short) 0,
 				(short) (ripemd160Length + 5), keyBuffer, (short) 0,
 				hashBuffer, (short) 0);
+	}
+
+	/**
+	 * Validates the given Bitcoin address for correctness.
+	 * 
+	 * @param src The buffer containing the Bitcoin address
+	 * @param addrOff Offset of the address inside the buffer
+	 * @param addrLength Length of the address
+	 */
+	private void validateBitcoinAddress(byte[] src, short addrOff,
+			short addrLength) throws ISOException {
+		if (addrLength < 26 || addrLength > 35) {
+			ISOException.throwIt(StatusCodes.WRONG_ADDRESS_LENGTH);
+		}
+
+		// TODO verify checksum?
 	}
 }

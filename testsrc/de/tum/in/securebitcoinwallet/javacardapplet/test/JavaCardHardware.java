@@ -19,6 +19,7 @@ import javax.smartcardio.TerminalFactory;
 import de.tum.in.securebitcoinwallet.javacardapplet.AppletInstructions;
 import de.tum.in.securebitcoinwallet.javacardapplet.SecureBitcoinWalletJavaCardApplet;
 import de.tum.in.securebitcoinwallet.javacardapplet.test.tests.AppletTestBase;
+import de.tum.in.securebitcoinwallet.javacardapplet.test.util.TestUtils;
 
 public class JavaCardHardware implements JavaCard {
 	
@@ -67,7 +68,7 @@ public class JavaCardHardware implements JavaCard {
 			} catch (IOException e) {
 				throw new RuntimeException("PUK file could not be created in "
 						+ pukFile.getAbsolutePath() + "PUK: "
-						+ AppletTestBase.getHexString(puk));
+						+ TestUtils.getHexString(puk));
 			}
 		}
 		return puk;

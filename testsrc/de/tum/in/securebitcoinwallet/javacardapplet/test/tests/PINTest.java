@@ -13,7 +13,7 @@ import org.junit.Test;
 import de.tum.in.securebitcoinwallet.javacardapplet.AppletInstructions;
 import de.tum.in.securebitcoinwallet.javacardapplet.SecureBitcoinWalletJavaCardApplet;
 import de.tum.in.securebitcoinwallet.javacardapplet.StatusCodes;
-import de.tum.in.securebitcoinwallet.javacardapplet.test.TestUtils;
+import de.tum.in.securebitcoinwallet.javacardapplet.test.util.TestUtils;
 
 /**
  * UnitTests for PIN functions.
@@ -91,9 +91,9 @@ public class PINTest extends AppletTestBase {
 		// block the card by authorization with a wrong pin several times
 		do {
 			response = smartCard.transmit(faultyAuthenticateInstruction);
-		} while ((short) response.getSW() == StatusCodes.SW_AUTH_FAILED);
+		} while ((short) response.getSW() == StatusCodes.AUTH_FAILED);
 
-		assertEquals(StatusCodes.SW_CARD_LOCKED, (short) response.getSW());
+		assertEquals(StatusCodes.CARD_LOCKED, (short) response.getSW());
 		
 		assertFalse(checkPINValidated());
 

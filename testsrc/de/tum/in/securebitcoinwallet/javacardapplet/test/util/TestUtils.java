@@ -1,4 +1,4 @@
-package de.tum.in.securebitcoinwallet.javacardapplet.test;
+package de.tum.in.securebitcoinwallet.javacardapplet.test.util;
 
 import java.lang.reflect.Array;
 
@@ -24,5 +24,16 @@ public abstract class TestUtils {
 	    System.arraycopy(b, 0, c, aLen, bLen);
 
 	    return c;
+	}
+
+	/**
+	 * Creates a String representing the given byte array in HEX notation.
+	 */
+	public static String getHexString(byte[] data) {
+		StringBuilder builder = new StringBuilder();
+		for (byte b : data) {
+			builder.append(String.format("%02X", b));
+		}
+		return builder.toString();
 	}
 }

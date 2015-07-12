@@ -20,8 +20,8 @@ public class EncryptedPrivateKey {
 	 */
 	boolean inUse;
 
-	public EncryptedPrivateKey() {
-		privateKey = new byte[64];
+	public EncryptedPrivateKey(short size) {
+		privateKey = new byte[size];
 		inUse = false;
 	}
 
@@ -35,6 +35,8 @@ public class EncryptedPrivateKey {
 		}
 		
 		Util.arrayCopy(src, srcOff, privateKey, (short) 0, srcLength);
+		
+		inUse = true;
 	}
 
 	/**
