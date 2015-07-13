@@ -223,7 +223,7 @@ public class KeyStore {
 			byte[] dest, short destOff) {
 
 		if (selectedAddress == (short) 0xFF) {
-			ISOException.throwIt(StatusCodes.CONDITIONS_NOT_SATISFIED);
+			ISOException.throwIt(StatusCodes.NO_KEY_SELECTED);
 		}
 
 		short keyLength = decryptPrivateKey(keys[selectedAddress], keyBuffer,
