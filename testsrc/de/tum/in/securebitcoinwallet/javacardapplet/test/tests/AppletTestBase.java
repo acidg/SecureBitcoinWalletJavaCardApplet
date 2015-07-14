@@ -126,4 +126,21 @@ public abstract class AppletTestBase {
 
 		return response.getBytes()[0] == 1 ? true : false;
 	}
+
+	/**
+	 * Retrieves the amount of free slots on the card.
+	 */
+	protected int getRemainingSlots() throws CardException {
+		CommandAPDU apdu = new CommandAPDU(
+				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
+				AppletInstructions.INS_GET_REMAINING_MEMORY, 0, 0);
+	
+		ResponseAPDU response = smartCard.transmit(apdu);
+		
+		assertTrue(commandSuccessful(response));
+		
+		byte[] data = response.getData();
+		int remainingSlots = ((data[0] << 8) + data[1]);
+		return remainingSlots;
+	}
 }

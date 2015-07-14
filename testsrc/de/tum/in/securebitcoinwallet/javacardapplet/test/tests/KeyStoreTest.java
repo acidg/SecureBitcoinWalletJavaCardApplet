@@ -1,5 +1,6 @@
 package de.tum.in.securebitcoinwallet.javacardapplet.test.tests;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.UnsupportedEncodingException;
@@ -62,12 +63,20 @@ public class KeyStoreTest extends AppletTestBase {
 				AppletInstructions.INS_GENERATE_KEY, 0, 0);
 
 		ResponseAPDU response = smartCard.transmit(generateKeyInstruction);
-		System.out.println(TestUtils.getHexString(response.getBytes()));
 		assertTrue(commandSuccessful(response));
-
-		assertTrue(response.getData().length == 65);
-
-		// TODO more testing: sign with key and validate result
+		
+		byte[] publicKey = response.getData();
+		
+		System.out.println(TestUtils.getHexString(publicKey));
+		
+		assertTrue(publicKey.length == 65);
+		assertTrue(publicKey[0] == 4);
+		
+		assertEquals(SecureBitcoinWalletJavaCardApplet.STORE_SIZE - 1, getRemainingSlots());
+		
+		deleteKey(TestUtils.calculateBitcoinAddress(publicKey).getBytes());
+		
+		assertEquals(SecureBitcoinWalletJavaCardApplet.STORE_SIZE, getRemainingSlots());
 	}
 
 	/**
@@ -96,8 +105,6 @@ public class KeyStoreTest extends AppletTestBase {
 		assertTrue(response.getData().length == 32);
 		
 		deleteKey(rawBitcoinAddress);
-
-		// TODO more testing
 	}
 
 	/**
