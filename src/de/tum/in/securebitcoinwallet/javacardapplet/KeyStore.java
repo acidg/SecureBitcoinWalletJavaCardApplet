@@ -259,13 +259,13 @@ public class KeyStore {
 		keyPair.genKeyPair();
 
 		ECPublicKey pubKey = (ECPublicKey) keyPair.getPublic();
-		
+
 		// Calculate the key's Bitcoin address, the address is stored in
 		// keyBuffer
 		short addressLength = calculateBitcoinAddress(pubKey);
-		
+
 		Util.setShort(dest, (short) 2, addressLength);
-		
+
 		// Store address in the addressToKeyIndexMap
 		addressToKeyIndexMap[addressIndex].setAddress(keyBuffer, (short) 0,
 				addressLength);
@@ -315,11 +315,7 @@ public class KeyStore {
 
 		// Encrypt imported key and store in keys
 		ECPrivateKey privKey = (ECPrivateKey) keyPair.getPrivate();
-		try {
-			privKey.setS(src, keyOff, keyLength);
-		} catch (CryptoException e) {
-			Util.setShort(src, (short) 0, e.getReason());
-		}
+		privKey.setS(src, keyOff, keyLength);
 
 		keys[addressIndex].setKey(keyBuffer, (short) 0,
 				encryptPrivateKey(privKey, keyBuffer, (short) 0));
