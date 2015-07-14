@@ -23,11 +23,6 @@ public class KeyStoreTest extends AppletTestBase {
 	protected final static String PRIVATE_KEY_HEX = "a5559c3f2f69a649617e57a78972c77aa4a309b3c413db24e0533495d9b93ae4";
 	protected final static String PUBLIC_KEY_HEX = "048d03747cf848dfb5384223c7128a95bc856a9741584d08cd4baa0db9ae895e49fb273edf7e99b7ced6cb2c732a1481727abb9b6f5ff9c28370f4f654645a9c53";
 
-	/**
-	 * Text used for checking the signature.
-	 */
-	private static final String HASHABLE_TEXT = "SecureBitcoinWallet";
-
 	public KeyStoreTest() throws CardException {
 		super();
 	}
@@ -97,12 +92,20 @@ public class KeyStoreTest extends AppletTestBase {
 				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
 				AppletInstructions.INS_GET_PRIVATE_KEY, 0x00, 0x00,
 				rawBitcoinAddress);
-
+		
+		// Export the key in encrypted form
 		ResponseAPDU response = smartCard.transmit(getKeyInstruction);
 
 		assertTrue(commandSuccessful(response));
+
+		// Check the key
+		byte[] encryptedKey = response.getData();
+		assertTrue(encryptedKey.length == 32);
 		
-		assertTrue(response.getData().length == 32);
+		deleteKey(rawBitcoinAddress);
+		
+		// check if key can be imported again
+		importEncryptedKey(rawBitcoinAddress, encryptedKey);
 		
 		deleteKey(rawBitcoinAddress);
 	}
@@ -136,6 +139,25 @@ public class KeyStoreTest extends AppletTestBase {
 		CommandAPDU importKeyInstruction = new CommandAPDU(
 				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
 				AppletInstructions.INS_IMPORT_PRIVATE_KEY,
+				bitcoinAddress.length, privateKey.length,
+				TestUtils.concatenate(bitcoinAddress, privateKey));
+
+		ResponseAPDU response = smartCard.transmit(importKeyInstruction);
+		assertTrue(commandSuccessful(response));
+	}
+	
+	/**
+	 * Imports the given encrypted private key with the given Bitcoin address
+	 * 
+	 * @param bitcoinAddress The Bitcoin address
+	 * @param privateKey The encrypted private key
+	 * @throws CardException
+	 */
+	private void importEncryptedKey(byte[] bitcoinAddress, byte[] privateKey)
+			throws CardException {
+		CommandAPDU importKeyInstruction = new CommandAPDU(
+				AppletInstructions.SECURE_BITCOIN_WALLET_CLA,
+				AppletInstructions.INS_IMPORT_ENCRYPTED_PRIVATE_KEY,
 				bitcoinAddress.length, privateKey.length,
 				TestUtils.concatenate(bitcoinAddress, privateKey));
 

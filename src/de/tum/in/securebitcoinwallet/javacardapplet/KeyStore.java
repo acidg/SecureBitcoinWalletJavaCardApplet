@@ -320,6 +320,42 @@ public class KeyStore {
 		keys[addressIndex].setKey(keyBuffer, (short) 0,
 				encryptPrivateKey(privKey, keyBuffer, (short) 0));
 	}
+	
+	/**
+	 * Stores the given encrypted private key in the key store.
+	 * 
+	 * @param src The byte array, in which the address and encrypted private key can be
+	 *            found.
+	 * @param addrOff Offset for the address inside the byte array
+	 * @param addrLength Length of the address
+	 * @param keyOff Offset of the private key inside the byte array
+	 * @param keyLength Length of the private key
+	 */
+	public void importEncryptedPrivateKey(byte[] src, short addrOff, short addrLength,
+			short keyOff, short keyLength) {
+		calculateIndexForAddress(src, addrOff, addrLength);
+
+		if ((addressIndex & 0xFF) != 0xFF) {
+			ISOException.throwIt(StatusCodes.KEY_ALREADY_IN_STORE);
+		}
+
+		findFirstFreePosition();
+
+		if (addressIndex == (byte) 0xFF) {
+			ISOException.throwIt(StatusCodes.KEYSTORE_FULL);
+		}
+
+		validateBitcoinAddress(src, addrOff, addrLength);
+
+		if (keyLength != 32) {
+			ISOException.throwIt(StatusCodes.WRONG_PRIVATE_KEY_LENGTH);
+		}
+
+		addressToKeyIndexMap[addressIndex].setAddress(src, addrOff, addrLength);
+
+		// Store imported key in keys
+		keys[addressIndex].setKey(src, keyOff, keyLength);
+	}
 
 	/**
 	 * Retrieves the encrypted private key for the given Bitcoin address.

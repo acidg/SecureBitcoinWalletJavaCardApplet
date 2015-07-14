@@ -184,6 +184,9 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 		case AppletInstructions.INS_IMPORT_PRIVATE_KEY:
 			importPrivateKey(apdu, buffer);
 			break;
+		case AppletInstructions.INS_IMPORT_ENCRYPTED_PRIVATE_KEY:
+			importEncryptedPrivateKey(apdu, buffer);
+			break;
 		case AppletInstructions.INS_GET_PRIVATE_KEY:
 			getPrivateKey(apdu, buffer);
 			break;
@@ -434,9 +437,6 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * P2:	length of private key in bytes
 	 * Lc:	total length
 	 * Data:	[address + privateKey]
-	 * 
-	 * Return: The address for which the key is stored, if the operation was
-	 * successful.
 	 * </pre>
 	 * 
 	 */
@@ -462,12 +462,47 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 				(short) (ISO7816.OFFSET_CDATA + buffer[ISO7816.OFFSET_P1]),
 				(short) buffer[ISO7816.OFFSET_P2]);
 	}
+	
+	/**
+	 * Stores the given encrypted private key in the EEPROM.
+	 * 
+	 * <pre>
+	 * INS:	0x24
+	 * P1:	length of address in bytes
+	 * P2:	length of encrypted private key in bytes
+	 * Lc:	total length
+	 * Data:	[address + encrypted privateKey]
+	 * </pre>
+	 * 
+	 */
+	private void importEncryptedPrivateKey(APDU apdu, byte[] buffer) {
+		if (!pin.isValidated()) {
+			ISOException.throwIt(StatusCodes.PIN_VERIFICATION_REQUIRED);
+		}
+
+		if (((short) (buffer[ISO7816.OFFSET_P1] & 0xFF)) > ((short) ADDRESS_SIZE & 0xFF)) {
+			ISOException.throwIt(StatusCodes.WRONG_ADDRESS_LENGTH);
+		}
+		
+		if (buffer[ISO7816.OFFSET_P2] != (byte) 0x20) {
+			ISOException.throwIt(StatusCodes.WRONG_PRIVATE_KEY_LENGTH);
+		}
+
+		if (apdu.setIncomingAndReceive() == 0) {
+			ISOException.throwIt(StatusCodes.DATA_INVALID);
+		}
+
+		keyStore.importEncryptedPrivateKey(buffer, (short) ISO7816.OFFSET_CDATA,
+				(short) buffer[ISO7816.OFFSET_P1],
+				(short) (ISO7816.OFFSET_CDATA + buffer[ISO7816.OFFSET_P1]),
+				(short) buffer[ISO7816.OFFSET_P2]);
+	}
 
 	/**
 	 * Gets the encrypted private key.
 	 * 
 	 * <pre>
-	 * INS:	0x24
+	 * INS:	0x26
 	 * P1:	0x00
 	 * P2:	0x00
 	 * Lc:	Length of Bitcoin address
@@ -498,7 +533,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * Deletes the private key for the given address.
 	 * 
 	 * <pre>
-	 * INS:	0x26
+	 * INS:	0x28
 	 * P1:	0x00
 	 * P2:	0x00
 	 * Lc:	Length of address
@@ -522,7 +557,7 @@ public class SecureBitcoinWalletJavaCardApplet extends Applet {
 	 * Returns the remaining memory in keys.
 	 * 
 	 * <pre>
-	 * INS:	0x28
+	 * INS:	0x40
 	 * P1:	0x00
 	 * P2:	0x00
 	 * Lc:	0x00
